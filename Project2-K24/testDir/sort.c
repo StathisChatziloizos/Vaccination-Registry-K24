@@ -9,7 +9,7 @@ int cmpstringp(const void *p1, const void *p2)
 }
 int main(int argc, char *argv[])
 {
-    char* arr[]= {"stathis", "nick", "soccer", "basketball", "curling", "airplane"};
+    char* arr[]= {"stathis", "joe", "soccer", "basketball", "curling", "airplane"};
 
     qsort(&arr[0], 6, sizeof(char *), cmpstringp);
 

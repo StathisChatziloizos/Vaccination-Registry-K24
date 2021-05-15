@@ -18,9 +18,6 @@
 #define BLOOM_STRING_MAX_LENGTH 50
 #define BUFFER_SIZE 512
 
-char* fifo1 = "fifo1";
-char* fifo2 = "fifo2";
-
 const int pipeSize = 512;
 
 int cmpstringp(const void *p1, const void *p2)
@@ -70,11 +67,14 @@ int main(int argc, char** argv)
     DIR *dir_ptr;
     struct dirent *dir;
 
-    int fd1, fd2;
+    // int fd1, fd2;
     char msgbuf[BUFFER_SIZE+1];
 
 	// Pinakas xwrwn
 	char* countries[20];
+
+	// Subdirectory poy analambanoyn ta Monitors
+	char* subdirectory;
 
 	// Boh8htikh metablhth
 	unsigned int counter = 0;
@@ -115,13 +115,24 @@ int main(int argc, char** argv)
 		// Agnohse to current kai to parent directory
 		if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
 			continue;
-		countries[counter] = dir->d_name;
+		// countries[counter] = dir->d_name;
+		countries[counter] = (char*) malloc (strlen(dir->d_name)+1);
+        strcpy (countries[counter],dir->d_name);
 		counter ++;
     }
+	
 	closedir(dir_ptr);
 	
 	// Takshnomish toy pinaka xwrwn alfabhtika
 	qsort(&countries[0], counter, sizeof(char *), cmpstringp);
+
+	// for (int i = 0; i < counter; i++)
+	// {
+	// 	printf("countries[%d] = %s\n",i, countries[i]);
+	// }
+	
+
+	// printf("countries[3] = %s\n",countries[3]);
 	
 	// Elegxos megethoys bloom filtroy
 	if(bloom_size<=0){
@@ -133,14 +144,39 @@ int main(int argc, char** argv)
 
 	BLOOM_init(&bloom, bloom_size);
 
-    if(mkfifo(fifo1,0666) == -1)     {perror("mkfifo");    return -1;}
-    if(mkfifo(fifo2,0666) == -1)     {perror("mkfifo");    return -1;}
+	// char* fifo1 = "fifo1";
+	// char* fifo2 = "fifo2";
+
+	// Dhmiourgia array gia apo8hkeysh twn file descriptors, 2 ana Monitor (1Read/1Write)
+	unsigned int* fd1 = (unsigned int*)malloc(num_Monitors * sizeof(int));
+	unsigned int* fd2 = (unsigned int*)malloc(num_Monitors * sizeof(int));
+
+	// Dhmiourgia array gia apo8hkeysh twn onomatwn twn named pipes, 2 ana Monitor (1Read/1Write)
+	char** fifo1 = (char**)malloc(num_Monitors * sizeof(char*));
+	char** fifo2 = (char**)malloc(num_Monitors * sizeof(char*));
+
+
+	// Dhmioyrgia named pipes, 2 ana Monitor (1Read/1Write)
+	for (int i = 0; i < num_Monitors; i++)
+	{
+		fifo1[i] = (char*)malloc(12 * sizeof(char));
+		fifo2[i] = (char*)malloc(12 * sizeof(char));
+		sprintf(fifo1[i],"fifo1-%d",i);
+		sprintf(fifo2[i],"fifo2-%d",i);
+
+		if(mkfifo(fifo1[i],0666) == -1)     {perror("mkfifo");    return -1;}
+		if(mkfifo(fifo2[i],0666) == -1)     {perror("mkfifo");    return -1;}
+		// printf("fifo1[%d] = %s, fifo2[%d] = %s\n", i, fifo1[i], i, fifo2[i]);
+	}
+	
+
+
 
     // if((fd2 = open(fifo2, O_RDWR | O_NONBLOCK)) < 0 )     {perror("Open fifo2");    return -1;}
 
-	printf("Counter = %d\n", counter);
+	// printf("Counter = %d\n", counter);
 	countries_per_Monitor = ceil((float)counter / num_Monitors);
-	printf("countriesPerMonitor = %d\n", countries_per_Monitor);
+	// printf("countriesPerMonitor = %d\n", countries_per_Monitor);
 
 
     pid_t pid[num_Monitors];
@@ -159,29 +195,39 @@ int main(int argc, char** argv)
         }
     }
 
-
 	int i;
     for(i=0; i < num_Monitors; i++)
     {
 		int nwrite, readBytes, writeBytes;
-		char* subdirectory = "input_dir/Greece";
+		// char* subdirectory;
+		subdirectory = (char*)malloc(50 * sizeof(char));
+
+		strcpy(subdirectory,directoryName);
+
+		// Pros8hkh '/' sto telos toy directory poy do8hke efoson leipei
+		if(subdirectory[strlen(subdirectory)-1] !='/')
+			strcat(subdirectory, "/");
+
+		strcat(subdirectory,countries[3]);
+
+
 		writeBytes = strlen(subdirectory) + 1;
 		char str[100];
 
-		if((fd2 = open(fifo2, O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-		if((nwrite = write(fd2,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-		if((nwrite = write(fd2,subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
-		if((nwrite = write(fd2,&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
-		close(fd2);
+		if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+		if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+		if((nwrite = write(fd2[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
+		if((nwrite = write(fd2[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
+		close(fd2[i]);
 
+		printf("Here\n");
 
-
-		if((fd1 = open(fifo1, O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
-        if(read(fd1, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+		if((fd1[i] = open(fifo1[i], O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
+        if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		// printf("readBytes = %d\n", readBytes);
 		// bloom.test = (char*)malloc(readBytes);
-		if(read(fd1, bloom.filter, bloom.size) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
-		close(fd1);
+		if(read(fd1[i], bloom.filter, bloom.size) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+		close(fd1[i]);
 		// printf("%s\n", bloom.filter);
 		readBytes = strlen(bloom.filter);
 		// if(read(fd1, &bloom, sizeof(bloom)) < 0)     {perror("read");    return -1;}
@@ -273,12 +319,28 @@ int main(int argc, char** argv)
 			break;
 		
     }
+
+
+	// Elef8erwsh mnhmhs
+	for(int i=0; i < counter; i++)
+	{
+		free(countries[i]);
+	}
+
+	for (int i = 0; i < num_Monitors; i++)
+	{
+		unlink(fifo1[i]);
+		unlink(fifo2[i]);
+		free(fifo1[i]);
+		free(fifo2[i]);
+	}
+	free(fifo1);
+	free(fifo2);
+	free(subdirectory);
 	
 	BLOOM_destroy(&bloom);
-	close(fd1);
-    close(fd2);
-    unlink(fifo1);
-    unlink(fifo2);
+	free(fd1);
+	free(fd2);
 
     return 0;
 }
