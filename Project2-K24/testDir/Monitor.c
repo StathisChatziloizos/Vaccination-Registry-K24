@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 
 	char* fifo1 = argv[1];
 	char* fifo2 = argv[2];
-	printf("Monitor: fifo1 = %s, fifo2 = %s", fifo1, fifo2);
+	printf("Monitor: fifo1 = %s, fifo2 = %s\n", fifo1, fifo2);
 	char* subdirectory;
 
 	if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}

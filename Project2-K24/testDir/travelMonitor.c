@@ -59,7 +59,7 @@ int main(int argc, char** argv)
 	// O ari8mos Monitor diergasiwn
 	unsigned int num_Monitors; 
 
-    Bloom bloom;
+    Bloom* bloom;
 	// To megethos bloom filtroy
     unsigned long bloom_size;
 
@@ -142,7 +142,11 @@ int main(int argc, char** argv)
 		
 	}
 
-	BLOOM_init(&bloom, bloom_size);
+	bloom = (Bloom*)malloc(num_Monitors * sizeof(Bloom));
+	for (int i = 0; i < num_Monitors; i++)
+	{
+		BLOOM_init(&bloom[i], bloom_size);
+	}
 
 	// char* fifo1 = "fifo1";
 	// char* fifo2 = "fifo2";
@@ -190,17 +194,18 @@ int main(int argc, char** argv)
 			// printf("pid==0 HERE\n");
             char* arg="hey" ;
             // sprintf(arg,"%d-Message", i);
-            char* args[] = {"./Monitor", "fifo1", "fifo2" , NULL};
+            char* args[] = {"./Monitor", fifo1[i], fifo2[i] , NULL};
             execv(args[0], args);   //exec ./Monitor
         }
     }
 
 	int i;
+	subdirectory = (char*)malloc(50 * sizeof(char));
+
     for(i=0; i < num_Monitors; i++)
     {
 		int nwrite, readBytes, writeBytes;
 		// char* subdirectory;
-		subdirectory = (char*)malloc(50 * sizeof(char));
 
 		strcpy(subdirectory,directoryName);
 
@@ -220,27 +225,20 @@ int main(int argc, char** argv)
 		if((nwrite = write(fd2[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
 		close(fd2[i]);
 
-		printf("Here\n");
-
 		if((fd1[i] = open(fifo1[i], O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
         if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		// printf("readBytes = %d\n", readBytes);
 		// bloom.test = (char*)malloc(readBytes);
-		if(read(fd1[i], bloom.filter, bloom.size) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+		if(read(fd1[i], bloom[i].filter, bloom[i].size) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
 		close(fd1[i]);
 		// printf("%s\n", bloom.filter);
-		readBytes = strlen(bloom.filter);
+		readBytes = strlen(bloom[i].filter);
 		// if(read(fd1, &bloom, sizeof(bloom)) < 0)     {perror("read");    return -1;}
 
 
         // printf("Message Received: %s - %d - %s\n", bloom.filter, bloom.size, bloom.test);
         fflush(stdout);
     }
-
-    // for (int i = 0; i < NUM_OF_PROCESSES; i++)
-    // {
-    //     wait(NULL);
-    // }
 
  
 
@@ -287,7 +285,9 @@ int main(int argc, char** argv)
 					// Evresh theshs prepei na eksetastei an einai set					
 					bit_position=BLOOM_hash(bloom_string,i);
 					// Ean h thesh den einai set o citizen den einai emvoliasmenos
-					if(BLOOM_get(&bloom,bit_position)==0)
+
+					// ------------------ TODO: I check only for the last Monitor ----------------------------------------
+					if(BLOOM_get(&bloom[num_Monitors-1],bit_position)==0)
 					{
 						
 						printf("NOT VACCINATED\n");												
@@ -333,12 +333,13 @@ int main(int argc, char** argv)
 		unlink(fifo2[i]);
 		free(fifo1[i]);
 		free(fifo2[i]);
+		BLOOM_destroy(&bloom[i]);
 	}
+	free(bloom);
 	free(fifo1);
 	free(fifo2);
 	free(subdirectory);
 	
-	BLOOM_destroy(&bloom);
 	free(fd1);
 	free(fd2);
 
