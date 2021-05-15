@@ -17,7 +17,7 @@
 #define NUM_OF_BUCKETS 50
 #define BLOOM_STRING_MAX_LENGTH 50
 
-#define BUFFER_SIZE 512 // For named PIPE
+#define BUFFER_SIZE 100
 
 // char* fifo1 = "simpleFifo";
 // char* fifo2 = "simpleFifo2";
@@ -112,6 +112,8 @@ int main(int argc, char** argv)
 		
 	num_of_buckets = NUM_OF_BUCKETS;
 
+	unsigned int offset = 0;
+
 	// Anoigma arxeioy ka8orismos mege8ous bloom filtroy
 		
 		unsigned char file[50];
@@ -198,9 +200,6 @@ int main(int argc, char** argv)
     // ----------------------------------------------------------------------
 
 
-    //if(mkfifo(fifo,0666) == -1)     {perror("mkfifo");    return -1;}
-
-
     // if((fd2 = open(fifo2, O_RDWR)) < 0 )     {perror("Open fifo2exec");    return -1;}
 
     // while(1)
@@ -215,8 +214,24 @@ int main(int argc, char** argv)
 
         // printf("Write strlen = %d\n", writeBytes);
     if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
+
+
 	if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-	if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
+
+
+	while(offset < bloom_size)
+	{
+		if((nwrite = write(fd1,bloom.filter + offset, BUFFER_SIZE)) == -1)	{perror("write");   return -1;}
+		offset += nwrite;
+	}
+
+
+
+	// if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
+
+
+
+	
 	close(fd1);
 		// if((nwrite = write(fd1,&msgbuf, strlen(msgbuf) +1)) == -1)    {perror("write");   return -1;}
         // if((nwrite = write(fd1,&bloom, sizeof(bloom))) == -1)    {perror("write");   return -1;}
@@ -227,6 +242,8 @@ int main(int argc, char** argv)
     close(fd1);
     close(fd2);
 	BLOOM_destroy(&bloom);
+	free(array_of_viruses);
+	free(subdirectory);
 
 	printf("Exiting child!\n");
     return 0;

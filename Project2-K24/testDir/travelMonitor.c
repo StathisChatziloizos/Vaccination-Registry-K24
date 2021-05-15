@@ -16,7 +16,7 @@
 #define INNER_MENU_LINE_LENGTH 200
 #define FILE_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 100
 
 const int pipeSize = 512;
 
@@ -80,6 +80,9 @@ int main(int argc, char** argv)
 	unsigned int counter = 0;
 
 	unsigned int countries_per_Monitor;
+
+	unsigned int offset = 0;
+
 
 
 	// Elegxoi orismatwn ekteleshs programmatos
@@ -204,7 +207,7 @@ int main(int argc, char** argv)
 
     for(i=0; i < num_Monitors; i++)
     {
-		int nwrite, readBytes, writeBytes;
+		int nwrite, nread, readBytes, writeBytes;
 		// char* subdirectory;
 
 		strcpy(subdirectory,directoryName);
@@ -229,7 +232,14 @@ int main(int argc, char** argv)
         if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		// printf("readBytes = %d\n", readBytes);
 		// bloom.test = (char*)malloc(readBytes);
-		if(read(fd1[i], bloom[i].filter, bloom[i].size) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+
+		while(offset < bloom[i].size)
+		{
+			if(nread = read(fd1[i], bloom[i].filter + offset, BUFFER_SIZE) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+			offset += nread;
+			printf("nread = %d, offset = %d\n", nread, offset);
+		}
+
 		close(fd1[i]);
 		// printf("%s\n", bloom.filter);
 		readBytes = strlen(bloom[i].filter);
@@ -241,7 +251,7 @@ int main(int argc, char** argv)
     }
 
  
-
+	printf("Here\n");
 
     while(1)
 	{

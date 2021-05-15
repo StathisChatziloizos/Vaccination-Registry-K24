@@ -16,4 +16,4 @@ clean:
 	rm -rf program child signal asigact travelMonitor Monitor
 
 pipes:
-	rm -rf fifo1 fifo2
+	rm -rf fifo*
