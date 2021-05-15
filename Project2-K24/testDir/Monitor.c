@@ -26,8 +26,24 @@ const int pipeSize = 512;
 
 int main(int argc, char** argv)
 {
+    int fd1, fd2, nwrite, readBytes, writeBytes;
+    char msgbuf[BUFFER_SIZE+1];
+
+	// To megethos bloom filtroy
+	unsigned long bloom_size;
+
 	char* fifo1 = argv[1];
 	char* fifo2 = argv[2];
+	char* subdirectory;
+
+	if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
+	if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+	subdirectory = (char*)malloc(readBytes);
+	if(read(fd2, subdirectory, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+	if(read(fd2, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}		// Lhpsh bloom_size
+	close(fd2);
+
+
     // ----------------------------------------------------------------------
     // Pedia eggrafwn
 	char* citizen_id;
@@ -48,9 +64,6 @@ int main(int argc, char** argv)
 	
 	// Deikths arxeioy eggrafwn
 	FILE* fp;
-	
-	// To megethos bloom filtroy
-	unsigned long bloom_size;
 		
 	// Entolh sto eswteriko menoy
 	char* command_name;
@@ -100,9 +113,11 @@ int main(int argc, char** argv)
 
 	// Anoigma arxeioy ka8orismos mege8ous bloom filtroy
 		
-		fp=fopen("input_dir/Greece/inputFile","r");
-		bloom_size=10000;
-	
+		unsigned char file[50];
+		strcpy(file,subdirectory);
+		strcat(file, "/inputFile");
+		fp=fopen(file,"r");
+
 	// Elegxos anoigmatos arxeioy
 	if(fp==NULL)
 	{
@@ -182,28 +197,26 @@ int main(int argc, char** argv)
     // ----------------------------------------------------------------------
 
 
-    int fd1, fd2, nwrite;
-    char msgbuf[BUFFER_SIZE+1];
-
     //if(mkfifo(fifo,0666) == -1)     {perror("mkfifo");    return -1;}
 
-    if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
 
     // if((fd2 = open(fifo2, O_RDWR)) < 0 )     {perror("Open fifo2exec");    return -1;}
 
     // while(1)
     // {
-		char* message;
+	char* message;
         // scanf("%s",msgbuf);
         //strcpy(msgbuf, argv[1]);
-		int writeBytes = strlen(bloom.filter) +1;
+	writeBytes = strlen(bloom.filter) +1;
 
 		//printf("%s", msgbuf);
 		//int writeBytes = strlen(msgbuf +1);
 
         // printf("Write strlen = %d\n", writeBytes);
-		if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-		if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
+    if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
+	if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+	if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
+	close(fd1);
 		// if((nwrite = write(fd1,&msgbuf, strlen(msgbuf) +1)) == -1)    {perror("write");   return -1;}
         // if((nwrite = write(fd1,&bloom, sizeof(bloom))) == -1)    {perror("write");   return -1;}
 		// sleep(2);

@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <dirent.h>
+#include <math.h>
 
 
 
@@ -15,16 +17,20 @@
 #define FILE_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
 #define BUFFER_SIZE 512
-#define NUM_OF_PROCESSES 1
 
 char* fifo1 = "fifo1";
 char* fifo2 = "fifo2";
 
 const int pipeSize = 512;
 
+int cmpstringp(const void *p1, const void *p2)
+{
+    return strcmp(*(const char **) p1, *(const char **) p2);
+}
 
 int main(int argc, char** argv)
 {
+
     // Pedia eggrafwn
 	char* citizen_id;
 	char* first_name;
@@ -48,23 +54,97 @@ int main(int argc, char** argv)
 	char inner_menu_line[INNER_MENU_LINE_LENGTH];	
 	
 	// Grammh arxeioy
-	char file_line[FILE_LINE_LENGTH];		
+	char file_line[FILE_LINE_LENGTH];
+
+	// To megethos toy buffer
+	unsigned int buffer_size;
+
+	// O ari8mos Monitor diergasiwn
+	unsigned int num_Monitors; 
 
     Bloom bloom;
-    int bloom_size = 10000;
-    BLOOM_init(&bloom, bloom_size);
+	// To megethos bloom filtroy
+    unsigned long bloom_size;
 
+	char* directoryName;
+    DIR *dir_ptr;
+    struct dirent *dir;
 
     int fd1, fd2;
     char msgbuf[BUFFER_SIZE+1];
+
+	// Pinakas xwrwn
+	char* countries[20];
+
+	// Boh8htikh metablhth
+	unsigned int counter = 0;
+
+	unsigned int countries_per_Monitor;
+
+
+	// Elegxoi orismatwn ekteleshs programmatos
+	if(argc!=9)
+	{
+		printf("Usage: travelMonitor -m numMonitors –b bufferSize -s sizeOfBloom -i input_dir\n");
+		return 0;	
+	}
+	
+	if(strcmp(argv[1],"-m")!=0&&strcmp(argv[3],"-b")!=0
+		&&strcmp(argv[5],"-s")!=0&&strcmp(argv[7],"-i")!=0)
+	{
+		printf("Usage: travelMonitor -m numMonitors –b bufferSize -s sizeOfBloom -i input_dir\n");
+		return 0;		
+	}
+	
+	// Ka8orismos ari8moy Monitor diergasiwn
+	num_Monitors=(unsigned int)(atoi(argv[2]));
+
+	// ka8orismos mege8ous toy buffer
+	buffer_size=(unsigned int)(atoi(argv[4]));
+
+	// ka8orismos mege8ous bloom filtroy
+	bloom_size=(unsigned long)(atol(argv[6]));
+
+	// Ka8orismos toy input_dir
+	directoryName = argv[8];
+
+	// Gemisma toy pinaka xwrwn me tis xwres toy in
+    if((dir_ptr = opendir(directoryName)) == NULL) 		{perror("Open Dir"); 	return -1;}
+	while((dir = readdir(dir_ptr)) != NULL )
+    {
+		// Agnohse to current kai to parent directory
+		if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
+			continue;
+		countries[counter] = dir->d_name;
+		counter ++;
+    }
+	closedir(dir_ptr);
+	
+	// Takshnomish toy pinaka xwrwn alfabhtika
+	qsort(&countries[0], counter, sizeof(char *), cmpstringp);
+	
+	// Elegxos megethoys bloom filtroy
+	if(bloom_size<=0){
+		
+		printf("Bloom filter length error\n");
+		return 0;
+		
+	}
+
+	BLOOM_init(&bloom, bloom_size);
 
     if(mkfifo(fifo1,0666) == -1)     {perror("mkfifo");    return -1;}
     if(mkfifo(fifo2,0666) == -1)     {perror("mkfifo");    return -1;}
 
     // if((fd2 = open(fifo2, O_RDWR | O_NONBLOCK)) < 0 )     {perror("Open fifo2");    return -1;}
 
-    pid_t pid[NUM_OF_PROCESSES];
-    for (int i = 0; i < NUM_OF_PROCESSES; i++)
+	printf("Counter = %d\n", counter);
+	countries_per_Monitor = ceil((float)counter / num_Monitors);
+	printf("countriesPerMonitor = %d\n", countries_per_Monitor);
+
+
+    pid_t pid[num_Monitors];
+    for (int i = 0; i < num_Monitors; i++)
     {
         pid[i] = fork();
 
@@ -79,19 +159,29 @@ int main(int argc, char** argv)
         }
     }
 
-	if((fd1 = open(fifo1, O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
-    int i=0;
-    while(i < NUM_OF_PROCESSES)
+
+	int i;
+    for(i=0; i < num_Monitors; i++)
     {
-        i++;
-		int readBytes;
-		char* message;
+		int nwrite, readBytes, writeBytes;
+		char* subdirectory = "input_dir/Greece";
+		writeBytes = strlen(subdirectory) + 1;
 		char str[100];
 
+		if((fd2 = open(fifo2, O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+		if((nwrite = write(fd2,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+		if((nwrite = write(fd2,subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
+		if((nwrite = write(fd2,&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
+		close(fd2);
+
+
+
+		if((fd1 = open(fifo1, O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
         if(read(fd1, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		// printf("readBytes = %d\n", readBytes);
 		// bloom.test = (char*)malloc(readBytes);
-		if(read(fd1, bloom.filter, bloom.size) < 0)     {perror("read");    return -1;}
+		if(read(fd1, bloom.filter, bloom.size) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+		close(fd1);
 		// printf("%s\n", bloom.filter);
 		readBytes = strlen(bloom.filter);
 		// if(read(fd1, &bloom, sizeof(bloom)) < 0)     {perror("read");    return -1;}
@@ -99,9 +189,7 @@ int main(int argc, char** argv)
 
         // printf("Message Received: %s - %d - %s\n", bloom.filter, bloom.size, bloom.test);
         fflush(stdout);
-        if(strcmp(msgbuf,"exit") == 0)      break;
     }
-	close(fd1);
 
     // for (int i = 0; i < NUM_OF_PROCESSES; i++)
     // {
@@ -131,13 +219,10 @@ int main(int argc, char** argv)
 		// vaccineStatusBloom //
 		else if(strcmp(command_name,"vaccineStatusBloom")==0)
 		{			
-			printf("Here\n");
 			// Diavasma orismatwn
 			citizen_id=strtok(NULL," \t\n");
 			virus_name=strtok(NULL," \t\n");
 			
-			printf("CitizenID %s, virus_name %s\n", citizen_id, virus_name);
-
 			// Elegxos gia elliph orismata
 			if(virus_name==NULL)
 			{
@@ -190,6 +275,7 @@ int main(int argc, char** argv)
     }
 	
 	BLOOM_destroy(&bloom);
+	close(fd1);
     close(fd2);
     unlink(fifo1);
     unlink(fifo2);
