@@ -16,7 +16,7 @@
 #define INNER_MENU_LINE_LENGTH 200
 #define FILE_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 2
 
 const int pipeSize = 512;
 
@@ -81,7 +81,7 @@ int main(int argc, char** argv)
 
 	unsigned int countries_per_Monitor;
 
-	unsigned int offset = 0;
+	unsigned long offset = 0;
 
 
 
@@ -207,7 +207,9 @@ int main(int argc, char** argv)
 
     for(i=0; i < num_Monitors; i++)
     {
-		int nwrite, nread, readBytes, writeBytes;
+		// Reset offset
+		offset = 0;
+		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0;
 		// char* subdirectory;
 
 		strcpy(subdirectory,directoryName);
@@ -229,16 +231,24 @@ int main(int argc, char** argv)
 		close(fd2[i]);
 
 		if((fd1[i] = open(fifo1[i], O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
+			// printf("PARENT fd: %d\n", fd1[i]);
         if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		// printf("readBytes = %d\n", readBytes);
 		// bloom.test = (char*)malloc(readBytes);
 
+		// printf("PARENT fd: %d\n", fd1[i]);
+		offset = 0;
 		while(offset < bloom[i].size)
 		{
-			if(nread = read(fd1[i], bloom[i].filter + offset, BUFFER_SIZE) < 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+			if(offset + BUFFER_SIZE > bloom[i].size)
+			{
+				if((nread = read(fd1[i], bloom[i].filter + offset, bloom[i].size - offset)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+				break;
+			}
+			if((nread = read(fd1[i], bloom[i].filter + offset, BUFFER_SIZE)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
 			offset += nread;
-			printf("nread = %d, offset = %d\n", nread, offset);
 		}
+		// printf("offset is %d\n", offset);
 
 		close(fd1[i]);
 		// printf("%s\n", bloom.filter);
@@ -250,9 +260,12 @@ int main(int argc, char** argv)
         fflush(stdout);
     }
 
+	for (int i = 0; i < num_Monitors; i++)
+	{
+		if(strcmp(bloom[0].filter, bloom[i].filter) != 0)
+			printf(" ----- bloom[%d] is WRONG\n",i);
+	}
  
-	printf("Here\n");
-
     while(1)
 	{
 		
@@ -297,7 +310,7 @@ int main(int argc, char** argv)
 					// Ean h thesh den einai set o citizen den einai emvoliasmenos
 
 					// ------------------ TODO: I check only for the last Monitor ----------------------------------------
-					if(BLOOM_get(&bloom[num_Monitors-1],bit_position)==0)
+					if(BLOOM_get(&bloom[5],bit_position)==0)
 					{
 						
 						printf("NOT VACCINATED\n");												

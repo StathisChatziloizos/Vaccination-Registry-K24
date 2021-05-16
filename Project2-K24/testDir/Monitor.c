@@ -17,7 +17,7 @@
 #define NUM_OF_BUCKETS 50
 #define BLOOM_STRING_MAX_LENGTH 50
 
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 2
 
 // char* fifo1 = "simpleFifo";
 // char* fifo2 = "simpleFifo2";
@@ -112,7 +112,7 @@ int main(int argc, char** argv)
 		
 	num_of_buckets = NUM_OF_BUCKETS;
 
-	unsigned int offset = 0;
+	unsigned long offset = 0;
 
 	// Anoigma arxeioy ka8orismos mege8ous bloom filtroy
 		
@@ -192,6 +192,8 @@ int main(int argc, char** argv)
 			
 	}
 
+	fclose(fp);
+
 	// Exontas diavasei olous toys ioys, apo to dentro paragoyme antistoixo pinaka deiktwn sta onomata toys
 	// Boliko gia seiriakh prospelash
 	array_of_viruses=malloc(num_of_viruses*sizeof(node*));
@@ -215,14 +217,17 @@ int main(int argc, char** argv)
         // printf("Write strlen = %d\n", writeBytes);
     if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
 
-
+	// printf("CHILD fd: %d\n", fd1);
 	if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 
+	// printf("CHILD fd: %d\n", fd1);
 
 	while(offset < bloom_size)
 	{
 		if((nwrite = write(fd1,bloom.filter + offset, BUFFER_SIZE)) == -1)	{perror("write");   return -1;}
 		offset += nwrite;
+		// printf("nwrite = %d, offset = %d\n", nwrite, offset);
+
 	}
 
 
