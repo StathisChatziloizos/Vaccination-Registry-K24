@@ -17,7 +17,7 @@
 #define NUM_OF_BUCKETS 50
 #define BLOOM_STRING_MAX_LENGTH 50
 
-#define BUFFER_SIZE 2
+// #define BUFFER_SIZE 2
 
 // char* fifo1 = "simpleFifo";
 // char* fifo2 = "simpleFifo2";
@@ -26,8 +26,9 @@ const int pipeSize = 512;
 
 int main(int argc, char** argv)
 {
-    int fd1, fd2, nwrite, readBytes, writeBytes;
-    char msgbuf[BUFFER_SIZE+1];
+    int fd1, fd2, nwrite, readBytes, writeBytes, numCountries;
+	unsigned int buffer_size;
+    // char msgbuf[BUFFER_SIZE+1];
 
 	// To megethos bloom filtroy
 	unsigned long bloom_size;
@@ -35,16 +36,23 @@ int main(int argc, char** argv)
 	char* fifo1 = argv[1];
 	char* fifo2 = argv[2];
 	// printf("Monitor: fifo1 = %s, fifo2 = %s\n", fifo1, fifo2);
-	char* subdirectory;
+	char** subdirectory;
 
 	if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
-	if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
-	subdirectory = (char*)malloc(readBytes);
-	if(read(fd2, subdirectory, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+	if(read(fd2, &buffer_size, sizeof(int)) < 0)     {perror("read");    return -1;}
+	if(read(fd2, &numCountries, sizeof(int)) < 0)     {perror("read");    return -1;}
+	subdirectory = (char**)malloc(numCountries * sizeof(char*));
+	for (int i = 0; i < numCountries; i++)
+	{
+		if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+		subdirectory[i] = (char*)malloc(readBytes);
+		if(read(fd2, subdirectory[i], readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+		// printf("Subdirectory[%d]: %s\n",i,subdirectory[i]);
+	}
 	if(read(fd2, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}		// Lhpsh bloom_size
 	close(fd2);
 
-	printf("Subdirectory: %s\n",subdirectory);
+	// printf("Buffer Size: %d, numCountries: %d\n",buffer_size, numCountries);
 
     // ----------------------------------------------------------------------
     // Pedia eggrafwn
@@ -118,7 +126,7 @@ int main(int argc, char** argv)
 	// Anoigma arxeioy ka8orismos mege8ous bloom filtroy
 		
 		unsigned char file[50];
-		strcpy(file,subdirectory);
+		strcpy(file,subdirectory[0]);
 		strcat(file, "/inputFile");
 		fp=fopen(file,"r");
 
@@ -225,7 +233,7 @@ int main(int argc, char** argv)
 
 	while(offset < bloom_size)
 	{
-		if((nwrite = write(fd1,bloom.filter + offset, BUFFER_SIZE)) == -1)	{perror("write");   return -1;}
+		if((nwrite = write(fd1,bloom.filter + offset, buffer_size)) == -1)	{perror("write");   return -1;}
 		offset += nwrite;
 		// printf("nwrite = %d, offset = %d\n", nwrite, offset);
 
@@ -249,8 +257,14 @@ int main(int argc, char** argv)
     close(fd2);
 	BLOOM_destroy(&bloom);
 	free(array_of_viruses);
+	for (int i = 0; i < numCountries; i++)
+	{
+		free(subdirectory[i]);
+	}
+	
 	free(subdirectory);
 
+	
 	printf("Exiting child!\n");
     return 0;
 }

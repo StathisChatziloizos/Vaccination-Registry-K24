@@ -17,7 +17,7 @@
 #define INNER_MENU_LINE_LENGTH 200
 #define FILE_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
-#define BUFFER_SIZE 2
+// #define BUFFER_SIZE 2
 
 const int pipeSize = 512;
 
@@ -74,7 +74,7 @@ int main(int argc, char** argv)
     struct dirent *dir;
 
     // int fd1, fd2;
-    char msgbuf[BUFFER_SIZE+1];
+    // char msgbuf[BUFFER_SIZE+1];
 
 	// Pinakas xwrwn
 	char* countries[20];
@@ -240,22 +240,30 @@ int main(int argc, char** argv)
 		
 		// char* subdirectory;
 
-		strcpy(subdirectory,directoryName);
-
-		// Pros8hkh '/' sto telos toy directory poy do8hke efoson leipei
-		if(subdirectory[strlen(subdirectory)-1] !='/')
-			strcat(subdirectory, "/");
-
-		strcat(subdirectory,monitor[i].countries[0]);
 
 
-		writeBytes = strlen(subdirectory) + 1;
+
 		// char str[100];
 
-		// Apostolh subdirectory kai bloom_size
+		// Apostolh buffer size, subdirectory, bloom_size
 		if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-		if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-		if((nwrite = write(fd2[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
+		if((nwrite = write(fd2[i],&buffer_size, sizeof(int))) == -1)    {perror("write");   return -1;}
+		if((nwrite = write(fd2[i],&monitor[i].numCountries, sizeof(int))) == -1)    {perror("write");   return -1;}
+		for(int j=0; j < monitor[i].numCountries; j++)
+		{
+			strcpy(subdirectory,directoryName);
+
+			// Pros8hkh '/' sto telos toy directory poy do8hke efoson leipei
+			if(subdirectory[strlen(subdirectory)-1] !='/')
+				strcat(subdirectory, "/");
+
+			strcat(subdirectory,monitor[i].countries[j]);
+			writeBytes = strlen(subdirectory) + 1;
+
+			// printf("Sending subdirectory %s\n",subdirectory);
+			if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+			if((nwrite = write(fd2[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
+		}
 		if((nwrite = write(fd2[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
 		close(fd2[i]);
 
@@ -265,12 +273,12 @@ int main(int argc, char** argv)
 		offset = 0;
 		while(offset < bloom[i].size)
 		{
-			if(offset + BUFFER_SIZE > bloom[i].size)
+			if(offset + buffer_size > bloom[i].size)
 			{
 				if((nread = read(fd1[i], bloom[i].filter + offset, bloom[i].size - offset)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
 				break;
 			}
-			if((nread = read(fd1[i], bloom[i].filter + offset, BUFFER_SIZE)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+			if((nread = read(fd1[i], bloom[i].filter + offset, buffer_size)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
 			offset += nread;
 		}
 		// printf("offset is %d\n", offset);
@@ -338,7 +346,7 @@ int main(int argc, char** argv)
 					// Ean h thesh den einai set o citizen den einai emvoliasmenos
 
 					// ------------------ TODO: I check only for the last Monitor ----------------------------------------
-					if(BLOOM_get(&bloom[5],bit_position)==0)
+					if(BLOOM_get(&bloom[num_Monitors -1],bit_position)==0)
 					{
 						
 						printf("NOT VACCINATED\n");												
