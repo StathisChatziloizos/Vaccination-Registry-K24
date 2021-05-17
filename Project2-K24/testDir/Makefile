@@ -3,7 +3,7 @@ program: parent.c child.c signal.c asigact.c travelMonitor.c Monitor.c
 	gcc -g -o child child.c
 	gcc -g -o signal signal.c
 	gcc -g -o asigact asigact.c
-	gcc -g -o travelMonitor travelMonitor.c bloom.c -lm
+	gcc -g -o travelMonitor travelMonitor.c bloom.c libTM.c -lm
 	gcc -g -o Monitor Monitor.c hash.c bst.c bloom.c skip_list.c
 
 

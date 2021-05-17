@@ -12,6 +12,7 @@
 
 
 #include "bloom.h"
+#include "libTM.h"
 
 #define INNER_MENU_LINE_LENGTH 200
 #define FILE_LINE_LENGTH 200
@@ -20,9 +21,14 @@
 
 const int pipeSize = 512;
 
-int cmpstringp(const void *p1, const void *p2)
+
+
+
+
+int comparator(const void *str1, const void *str2)
 {
-    return strcmp(*(const char **) p1, *(const char **) p2);
+	int result = strcmp(*(const char **) str1, *(const char **) str2);
+    return result;
 }
 
 int main(int argc, char** argv)
@@ -83,6 +89,8 @@ int main(int argc, char** argv)
 
 	unsigned long offset = 0;
 
+	Monitor* monitor;
+
 
 
 	// Elegxoi orismatwn ekteleshs programmatos
@@ -127,7 +135,7 @@ int main(int argc, char** argv)
 	closedir(dir_ptr);
 	
 	// Takshnomish toy pinaka xwrwn alfabhtika
-	qsort(&countries[0], counter, sizeof(char *), cmpstringp);
+	qsort(&countries[0], counter, sizeof(char *), comparator);
 
 	// for (int i = 0; i < counter; i++)
 	// {
@@ -144,6 +152,9 @@ int main(int argc, char** argv)
 		return 0;
 		
 	}
+
+	// Desmeysh mnhmhs gia ta Monitors
+	monitor = (Monitor*)malloc(num_Monitors * sizeof(Monitor));
 
 	bloom = (Bloom*)malloc(num_Monitors * sizeof(Bloom));
 	for (int i = 0; i < num_Monitors; i++)
@@ -204,12 +215,29 @@ int main(int argc, char** argv)
 
 	int i;
 	subdirectory = (char*)malloc(50 * sizeof(char));
+	
+
 
     for(i=0; i < num_Monitors; i++)
     {
 		// Reset offset
 		offset = 0;
-		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0;
+		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0, num_Countries = 0;
+
+		for (int j = i; j <= counter-1; j+=num_Monitors)
+		{	
+			num_Countries++;
+		}
+		MONITOR_init(&monitor[i], num_Countries);
+		unsigned int position = 0;
+		for (int j = i; j <= counter-1; j+=num_Monitors)
+		{
+			strcpy(monitor[i].countries[position],countries[j]);
+			position++;
+		}
+
+		// printf("\tCOUNTER %d Monitor[%d] ---> num_Countries = %d\n",counter, i, num_Countries);
+		
 		// char* subdirectory;
 
 		strcpy(subdirectory,directoryName);
@@ -218,25 +246,22 @@ int main(int argc, char** argv)
 		if(subdirectory[strlen(subdirectory)-1] !='/')
 			strcat(subdirectory, "/");
 
-		strcat(subdirectory,countries[3]);
+		strcat(subdirectory,monitor[i].countries[0]);
 
 
 		writeBytes = strlen(subdirectory) + 1;
-		char str[100];
+		// char str[100];
 
+		// Apostolh subdirectory kai bloom_size
 		if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 		if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 		if((nwrite = write(fd2[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
 		if((nwrite = write(fd2[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
 		close(fd2[i]);
 
+		// Lhpsh bloom filter
 		if((fd1[i] = open(fifo1[i], O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
-			// printf("PARENT fd: %d\n", fd1[i]);
         if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
-		// printf("readBytes = %d\n", readBytes);
-		// bloom.test = (char*)malloc(readBytes);
-
-		// printf("PARENT fd: %d\n", fd1[i]);
 		offset = 0;
 		while(offset < bloom[i].size)
 		{
@@ -265,6 +290,9 @@ int main(int argc, char** argv)
 		if(strcmp(bloom[0].filter, bloom[i].filter) != 0)
 			printf(" ----- bloom[%d] is WRONG\n",i);
 	}
+
+	// usleep(50000);
+	// MONITOR_print_all(monitor,num_Monitors);
  
     while(1)
 	{
@@ -357,8 +385,10 @@ int main(int argc, char** argv)
 		free(fifo1[i]);
 		free(fifo2[i]);
 		BLOOM_destroy(&bloom[i]);
+		MONITOR_destroy(&monitor[i]);
 	}
 	free(bloom);
+	free(monitor);
 	free(fifo1);
 	free(fifo2);
 	free(subdirectory);

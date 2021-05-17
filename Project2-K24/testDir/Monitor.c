@@ -34,7 +34,7 @@ int main(int argc, char** argv)
 
 	char* fifo1 = argv[1];
 	char* fifo2 = argv[2];
-	printf("Monitor: fifo1 = %s, fifo2 = %s\n", fifo1, fifo2);
+	// printf("Monitor: fifo1 = %s, fifo2 = %s\n", fifo1, fifo2);
 	char* subdirectory;
 
 	if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
@@ -44,6 +44,7 @@ int main(int argc, char** argv)
 	if(read(fd2, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}		// Lhpsh bloom_size
 	close(fd2);
 
+	printf("Subdirectory: %s\n",subdirectory);
 
     // ----------------------------------------------------------------------
     // Pedia eggrafwn
@@ -229,15 +230,15 @@ int main(int argc, char** argv)
 		// printf("nwrite = %d, offset = %d\n", nwrite, offset);
 
 	}
+	close(fd1);
 
 
 
 	// if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
 
-
-
 	
-	close(fd1);
+
+
 		// if((nwrite = write(fd1,&msgbuf, strlen(msgbuf) +1)) == -1)    {perror("write");   return -1;}
         // if((nwrite = write(fd1,&bloom, sizeof(bloom))) == -1)    {perror("write");   return -1;}
 		// sleep(2);
