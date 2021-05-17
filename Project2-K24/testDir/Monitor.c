@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 
 #include "hash.h"
@@ -28,6 +29,10 @@ int main(int argc, char** argv)
 {
     int fd1, fd2, nwrite, readBytes, writeBytes, numCountries;
 	unsigned int buffer_size;
+
+	char* directoryName;
+    DIR* dir_ptr;
+    struct dirent* dir;
     // char msgbuf[BUFFER_SIZE+1];
 
 	// To megethos bloom filtroy
@@ -51,6 +56,20 @@ int main(int argc, char** argv)
 	}
 	if(read(fd2, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}		// Lhpsh bloom_size
 	close(fd2);
+
+	for (int i = 0; i < numCountries; i++)
+	{
+		printf("Subdirectory[%d]: %s\n",i,subdirectory[i]);
+		if((dir_ptr = opendir(subdirectory[i])) == NULL) 		{perror("Open Dir"); 	return -1;}
+		while((dir = readdir(dir_ptr)) != NULL )
+		{
+			if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
+				continue;
+			printf("dir->d_name = %s\n",dir->d_name);
+			printf("--------------------------\n");
+		}
+		closedir(dir_ptr);
+	}
 
 	// printf("Buffer Size: %d, numCountries: %d\n",buffer_size, numCountries);
 

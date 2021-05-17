@@ -70,8 +70,8 @@ int main(int argc, char** argv)
     unsigned long bloom_size;
 
 	char* directoryName;
-    DIR *dir_ptr;
-    struct dirent *dir;
+    DIR* dir_ptr;
+    struct dirent* dir;
 
     // int fd1, fd2;
     // char msgbuf[BUFFER_SIZE+1];
