@@ -57,19 +57,40 @@ int main(int argc, char** argv)
 	if(read(fd2, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}		// Lhpsh bloom_size
 	close(fd2);
 
+	char*** files = (char***)malloc(numCountries * sizeof(char**));
+
+	int* counter = (int*)malloc(numCountries * sizeof(int));
+	// int max_counter=0;
 	for (int i = 0; i < numCountries; i++)
 	{
-		printf("Subdirectory[%d]: %s\n",i,subdirectory[i]);
+		counter[i]=0;
+		files[i] = (char**)malloc(40 * sizeof(char*));
+		// printf("Subdirectory[%d]: %s\n",i,subdirectory[i]);
 		if((dir_ptr = opendir(subdirectory[i])) == NULL) 		{perror("Open Dir"); 	return -1;}
 		while((dir = readdir(dir_ptr)) != NULL )
 		{
 			if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
 				continue;
-			printf("dir->d_name = %s\n",dir->d_name);
-			printf("--------------------------\n");
+			files[i][counter[i]] = (char*)malloc(strlen(dir->d_name)+1);
+			strcpy (files[i][counter[i]],dir->d_name);
+			counter[i]++;
 		}
+		// if(counter > max_counter)
+		// 	max_counter = counter;
 		closedir(dir_ptr);
 	}
+	// printf("max counter: %d", max_counter);
+
+	// for (int i = 0; i < numCountries; i++)
+	// {
+	// 	for (int  j = 0; j < counter[i]; j++)
+	// 	{
+	// 		if(files[i][j] == NULL)
+	// 			continue;
+	// 		printf("files[%d][%d] = %s/%s\n", i, j, subdirectory[i],files[i][j]);
+	// 	}
+	// }
+
 
 	// printf("Buffer Size: %d, numCountries: %d\n",buffer_size, numCountries);
 
@@ -144,19 +165,7 @@ int main(int argc, char** argv)
 
 	// Anoigma arxeioy ka8orismos mege8ous bloom filtroy
 		
-		unsigned char file[50];
-		strcpy(file,subdirectory[0]);
-		strcat(file, "/inputFile");
-		fp=fopen(file,"r");
 
-	// Elegxos anoigmatos arxeioy
-	if(fp==NULL)
-	{
-		
-		printf("Open file error\n");
-		return 0;
-		
-	}
 		
 	// Arxikopoihsh toy pinaka katakermatismoy twn citizen
 	HASH_init(&record_hash_table,num_of_buckets);
@@ -166,61 +175,85 @@ int main(int argc, char** argv)
 	
 	// Arxikopoihsh toy bloom filtrou
 	BLOOM_init(&bloom,bloom_size);
-	
-	while(fgets(file_line,FILE_LINE_LENGTH-1,fp)!=NULL)
+
+	unsigned char file[50];
+	for (int j = 0; j < numCountries; j++)
 	{
-		char current_line[200];
-		strcpy(current_line,file_line);		
-		
-		citizen_id=strtok(file_line," \t\n");
-		first_name=strtok(NULL," \t\n");
-		last_name=strtok(NULL," \t\n");
-		country_name=strtok(NULL," \t\n"); 
-		age=strtok(NULL," \t\n"); 
-		virus_name=strtok(NULL," \t\n");
-		vaccination_condition=strtok(NULL," \t\n"); 
-		date=strtok(NULL," \t\n");
-
-		// An to record den iparxei tote prosthetei ton asthenh sto country list
-		if(HASH_exists(&record_hash_table, citizen_id)==NULL)
-			COUNTRIES_list_insertLast(&head,country_name, atoi(age));
-
-		citizen_record=HASH_add_patient(&record_hash_table,current_line);
-
-		
-		virus_node=BST_search(virus_tree,virus_name);			
-		
-		if(virus_node==NULL)
+		for (int  z = 0; z < counter[j]; z++)
 		{
-			virus_node=BST_insert(&virus_tree,virus_name);	
-			num_of_viruses++;		
-		}
-		
-		// Ean prokeitai gia eggrafh emvoliasmenoy eisagetai sto bloom filter kai sthn antistoixh lista emvoliasmenwn
-		if(!strcmp(vaccination_condition,"YES"))
-		{	
-			
-			for(i=0;i<16;i++)
-			{
-				// Kataskeyh string poy tha ginei hash
-				sprintf(bloom_string,"%s%s",citizen_id,virus_name);
-					
-				// Evresh theshs poy tha ginei set
-				bit_position=BLOOM_hash(bloom_string,i);
-				
-				BLOOM_insert(&bloom,bit_position);
-			}
-							
-			SKIP_LIST_insert(&(virus_node->vacc_list),atoi(citizen_id),citizen_record,date);
-						
-		}
-		// Diaforetika exoyme eisagwgh monaxa sth non vaccinated list
-		else
-			SKIP_LIST_insert(&(virus_node->not_vacc_list),atoi(citizen_id),citizen_record,NULL);	
-			
-	}
+				if(files[j][z] == NULL)
+					continue;
+			strcpy(file,subdirectory[j]);
+			strcat(file, "/");
+			strcat(file,files[j][z]);
+			printf("file: %s\n",file);
+			fp=fopen(file,"r");
 
-	fclose(fp);
+			// Elegxos anoigmatos arxeioy
+			if(fp==NULL)
+			{
+				
+				printf("Open file error\n");
+				return 0;
+				
+			}
+			
+			while(fgets(file_line,FILE_LINE_LENGTH-1,fp)!=NULL)
+			{
+				char current_line[200];
+				strcpy(current_line,file_line);		
+				
+				citizen_id=strtok(file_line," \t\n");
+				first_name=strtok(NULL," \t\n");
+				last_name=strtok(NULL," \t\n");
+				country_name=strtok(NULL," \t\n"); 
+				age=strtok(NULL," \t\n"); 
+				virus_name=strtok(NULL," \t\n");
+				vaccination_condition=strtok(NULL," \t\n"); 
+				date=strtok(NULL," \t\n");
+
+				// An to record den iparxei tote prosthetei ton asthenh sto country list
+				if(HASH_exists(&record_hash_table, citizen_id)==NULL)
+					COUNTRIES_list_insertLast(&head,country_name, atoi(age));
+
+				citizen_record=HASH_add_patient(&record_hash_table,current_line);
+
+				
+				virus_node=BST_search(virus_tree,virus_name);			
+				
+				if(virus_node==NULL)
+				{
+					virus_node=BST_insert(&virus_tree,virus_name);	
+					num_of_viruses++;		
+				}
+				
+				// Ean prokeitai gia eggrafh emvoliasmenoy eisagetai sto bloom filter kai sthn antistoixh lista emvoliasmenwn
+				if(!strcmp(vaccination_condition,"YES"))
+				{	
+					
+					for(i=0;i<16;i++)
+					{
+						// Kataskeyh string poy tha ginei hash
+						sprintf(bloom_string,"%s%s",citizen_id,virus_name);
+							
+						// Evresh theshs poy tha ginei set
+						bit_position=BLOOM_hash(bloom_string,i);
+						
+						BLOOM_insert(&bloom,bit_position);
+					}
+									
+					SKIP_LIST_insert(&(virus_node->vacc_list),atoi(citizen_id),citizen_record,date);
+								
+				}
+				// Diaforetika exoyme eisagwgh monaxa sth non vaccinated list
+				else
+					SKIP_LIST_insert(&(virus_node->not_vacc_list),atoi(citizen_id),citizen_record,NULL);	
+					
+			}
+
+			fclose(fp);
+		}
+	}
 
 	// Exontas diavasei olous toys ioys, apo to dentro paragoyme antistoixo pinaka deiktwn sta onomata toys
 	// Boliko gia seiriakh prospelash
@@ -279,10 +312,17 @@ int main(int argc, char** argv)
 	for (int i = 0; i < numCountries; i++)
 	{
 		free(subdirectory[i]);
+		for (int  j = 0; j < counter[i]; j++)
+		{
+			free(files[i][j]);
+		}
+		
+		free(files[i]);
 	}
 	
 	free(subdirectory);
-
+	free(counter);
+	free(files);
 	
 	printf("Exiting child!\n");
     return 0;

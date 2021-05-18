@@ -77,7 +77,7 @@ int main(int argc, char** argv)
     // char msgbuf[BUFFER_SIZE+1];
 
 	// Pinakas xwrwn
-	char* countries[20];
+	char* countries[200];
 
 	// Subdirectory poy analambanoyn ta Monitors
 	char* subdirectory;
@@ -293,11 +293,11 @@ int main(int argc, char** argv)
         fflush(stdout);
     }
 
-	for (int i = 0; i < num_Monitors; i++)
-	{
-		if(strcmp(bloom[0].filter, bloom[i].filter) != 0)
-			printf(" ----- bloom[%d] is WRONG\n",i);
-	}
+	// for (int i = 0; i < num_Monitors; i++)
+	// {
+	// 	if(strcmp(bloom[0].filter, bloom[i].filter) != 0)
+	// 		printf(" ----- bloom[%d] is WRONG\n",i);
+	// }
 
 	// usleep(50000);
 	// MONITOR_print_all(monitor,num_Monitors);
@@ -346,7 +346,7 @@ int main(int argc, char** argv)
 					// Ean h thesh den einai set o citizen den einai emvoliasmenos
 
 					// ------------------ TODO: I check only for the last Monitor ----------------------------------------
-					if(BLOOM_get(&bloom[num_Monitors -1],bit_position)==0)
+					if(BLOOM_get(&bloom[0],bit_position)==0)
 					{
 						
 						printf("NOT VACCINATED\n");												
