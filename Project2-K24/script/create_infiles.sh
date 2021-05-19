@@ -50,11 +50,11 @@ fi
 
 # Ta citizen records antigrafontai se pinaka
 readarray -t arrayOfEntries < $1
-# mapfile -t arrayOfEntries < $1
 
 
 # Ypologizetai kai to plithos toys
 numberOfEntries=${#arrayOfEntries[@]}
+
 
 # An einai mideniko einai sflama.
 if [[ $numberOfEntries -eq 0 ]]
@@ -66,20 +66,53 @@ then
 	
 fi
 
+
 # Oi diaforetikes xwres antigrafontai se pinaka
 arrayOfCountries=($(cut -d " " -f 4  inputFile | sort -u))
+
 
 # Ypologizetai kai to plithos toys
 numberOfCountries=${#arrayOfCountries[@]}
 
+
+# Ftiaxnoyme ta subdirectories, ena gia ka8e xwra
+# Se ka8e xwra antistoixei ena index poy deixnei
+# ka8e fora to stadio tou Round Robin poy vriskomaste
 for (( i=0; i<$numberOfCountries; i++ ))
 do
-	# echo ${arrayOfCountries[i]}
+
+	# Dhmioyrgia kai arxikopoihsh toy pinaka twn index
+	countriesIndex[$i]=0
+
+	# Dhmiourgia subdirectory ths xwras
 	mkdir "$2/${arrayOfCountries[i]}"
-	for (( j=0; j<$3; j++ ))
+
+done
+
+
+
+# Ka8e entry toy inputFile katanemetai me Round Robin sto swsto arxeio
+# toy subdirectory thw xwras
+for (( i=0; i<$numberOfEntries; i++ ))
+do
+
+	var=(${arrayOfEntries[i]})
+	for (( j=0; j<$numberOfCountries; j++ ))
 	do
-		touch "$2/${arrayOfCountries[i]}/${arrayOfCountries[i]}-$j.txt"
+		
+		# Ean vre8hke h swsth xwra, to entry topo8eteite me RR sto swsto arxeio 
+		if [[ "${var[3]}" == "${arrayOfCountries[j]}" ]]
+		then
+
+			echo ${arrayOfEntries[i]} >> "$2/${arrayOfCountries[j]}/${arrayOfCountries[j]}-${countriesIndex[j]}.txt"
+
+			# Ayksisi toy index ths xwras kai reset an ypervei ton ari8mo twn arxeiwn
+			((countriesIndex[j]++))
+			countriesIndex[j]=$((${countriesIndex[j]}%$3))
+			
+			break
+		fi
+
 	done
 
-	# echo $var
 done
