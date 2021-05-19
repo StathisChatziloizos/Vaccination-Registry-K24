@@ -355,9 +355,9 @@ int main(int argc, char** argv)
 				writeBytes = strlen(command_name) +1;
 				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 				if((nwrite = write(fd2[countryIndex],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
-				// close(fd2[countryIndex]);
-				usleep(1);
-				// if((fd2[countryIndex] = open(fifo2[countryIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+				close(fd2[countryIndex]);
+				// usleep(1);
+				if((fd2[countryIndex] = open(fifo2[countryIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 				writeBytes = strlen(citizen_id) +1;
 				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 				if((nwrite = write(fd2[countryIndex],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}

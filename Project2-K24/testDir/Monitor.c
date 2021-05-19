@@ -296,8 +296,10 @@ int main(int argc, char** argv)
 		if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		if(read(fd2, command, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
 		close(fd2);
+		fflush(stdout);
 
-		printf("command: %s\n", command);
+
+		// printf("command: %s\n", command);
 		if (strcmp(command,"exit")==0)
 		{
 			break;
@@ -317,6 +319,36 @@ int main(int argc, char** argv)
 			close(fd2);
 
 			printf("CitizenID %s, Virus Name %s\n", citizen_id, virus_name);
+
+			// Anazhtoyme ton komvo toy ioy sto dentro
+			virus_node=BST_search(virus_tree,virus_name);
+			
+			// An brethei kanoyme anazhthsh sthn antistoixh skip list
+			if(virus_node)
+			{
+				
+				skip_lst_node=SKIP_LIST_search(virus_node->vacc_list,atoi(citizen_id));
+				
+				//  Emfanizoyme to apotelesma ths anazhthshs
+				if(skip_lst_node)
+				{
+					
+					printf("VACCINATED ON %s\n",skip_lst_node->date);
+					
+				}
+				else
+				{
+					
+					printf("NOT VACCINATED\n");							
+					
+				}					
+				
+			}
+			else
+			{
+			// Edw einai h periptwsh poy den exei brethei o ios
+				printf("Can't find virus\n");						
+			}
 		}
 	}
 	
