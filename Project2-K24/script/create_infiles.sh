@@ -44,7 +44,6 @@ then
     exit
 
 else
-	echo ""
 	mkdir $2
 fi
 
@@ -77,5 +76,10 @@ for (( i=0; i<$numberOfCountries; i++ ))
 do
 	# echo ${arrayOfCountries[i]}
 	mkdir "$2/${arrayOfCountries[i]}"
+	for (( j=0; j<$3; j++ ))
+	do
+		touch "$2/${arrayOfCountries[i]}/${arrayOfCountries[i]}-$j.txt"
+	done
+
 	# echo $var
 done
