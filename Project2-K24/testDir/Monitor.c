@@ -42,6 +42,7 @@ int main(int argc, char** argv)
 	char* fifo2 = argv[2];
 	// printf("Monitor: fifo1 = %s, fifo2 = %s\n", fifo1, fifo2);
 	char** subdirectory;
+	char command[20];
 
 	if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
 	if(read(fd2, &buffer_size, sizeof(int)) < 0)     {perror("read");    return -1;}
@@ -114,9 +115,6 @@ int main(int argc, char** argv)
 	
 	// Deikths arxeioy eggrafwn
 	FILE* fp;
-		
-	// Entolh sto eswteriko menoy
-	char* command_name;
 
 	// Eswterikh grammh entolwn
 	char inner_menu_line[INNER_MENU_LINE_LENGTH];	
@@ -186,7 +184,7 @@ int main(int argc, char** argv)
 			strcpy(file,subdirectory[j]);
 			strcat(file, "/");
 			strcat(file,files[j][z]);
-			printf("file: %s\n",file);
+			// printf("file: %s\n",file);
 			fp=fopen(file,"r");
 
 			// Elegxos anoigmatos arxeioy
@@ -292,7 +290,36 @@ int main(int argc, char** argv)
 	}
 	close(fd1);
 
+	while (1)
+	{
+		if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
+		if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+		if(read(fd2, command, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+		close(fd2);
 
+		printf("command: %s\n", command);
+		if (strcmp(command,"exit")==0)
+		{
+			break;
+		}
+		else if (strcmp(command,"travelRequest")==0)
+		{
+			// printf("M:fd2 %d\n",fd2);
+			if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
+			// printf("here\n");
+			if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+			// printf("Readbytes %d\n",readBytes);
+			if(read(fd2, citizen_id, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+			// printf("citizenID %s\n", citizen_id);
+
+			if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+			if(read(fd2, virus_name, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+			close(fd2);
+
+			printf("CitizenID %s, Virus Name %s\n", citizen_id, virus_name);
+		}
+	}
+	
 
 	// if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
 
@@ -308,6 +335,8 @@ int main(int argc, char** argv)
     close(fd1);
     close(fd2);
 	BLOOM_destroy(&bloom);
+	HASH_clear(&record_hash_table);
+	BST_destroy(virus_tree);
 	free(array_of_viruses);
 	for (int i = 0; i < numCountries; i++)
 	{

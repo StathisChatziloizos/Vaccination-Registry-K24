@@ -39,6 +39,8 @@ int main(int argc, char** argv)
 	char* first_name;
 	char* last_name;
 	char* country_name;
+	char* country_from;
+	char* country_to;
 	char* age;
 	char* virus_name;
 	char* vaccination_condition;
@@ -300,11 +302,11 @@ int main(int argc, char** argv)
 	// }
 
 	// usleep(50000);
-	// MONITOR_print_all(monitor,num_Monitors);
+	MONITOR_print_all(monitor,num_Monitors);
  
     while(1)
 	{
-		
+		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0;
 		printf("/");		
 	
 		// Diavasma entolhs xrhsth
@@ -318,6 +320,57 @@ int main(int argc, char** argv)
 		//  Voi8htiko command poy ka8arizei thn o8onh
 		if(strcmp(command_name,"clear")==0)
 			system("clear");
+		
+		// travelRequest //
+		else if (strcmp(command_name,"travelRequest")==0)
+		{
+			// Diavasma orismatwn
+			citizen_id=strtok(NULL," \t\n");
+			date=strtok(NULL," \t\n");
+			country_from=strtok(NULL," \t\n");
+			country_to=strtok(NULL," \t\n");
+			virus_name=strtok(NULL," \t\n");
+			if(virus_name==NULL)
+			{
+				
+				printf("Missing argument\n");
+				
+			}
+			else
+			{
+				int countryIndex = MONITOR_search_country(monitor, country_from, num_Monitors);
+				if (countryIndex == -1)
+				{
+					printf("This country doesn't exist: %s \n", country_from);
+					continue;
+				}
+				
+				printf("Monitor %d\n", countryIndex);
+
+
+				// printf("TM:fd2 %d\n",fd2[countryIndex]);
+				// Apostolh travelRequest command
+				if((fd2[countryIndex] = open(fifo2[countryIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+
+				writeBytes = strlen(command_name) +1;
+				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[countryIndex],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				// close(fd2[countryIndex]);
+				usleep(1);
+				// if((fd2[countryIndex] = open(fifo2[countryIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+				writeBytes = strlen(citizen_id) +1;
+				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[countryIndex],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}
+
+				writeBytes = strlen(virus_name) +1;
+				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[countryIndex],virus_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				close(fd2[countryIndex]);
+
+			}
+			printf("\n");
+		}
+		
 		
 		// vaccineStatusBloom //
 		else if(strcmp(command_name,"vaccineStatusBloom")==0)
@@ -375,8 +428,18 @@ int main(int argc, char** argv)
         	
 		// exit //
 		else if(strcmp(command_name,"exit")==0)
+		{
+			writeBytes = strlen(command_name) +1;
+			for(i=0; i < num_Monitors; i++)
+			{
+				// Apostolh exit command
+				if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+				if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[i],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				close(fd2[i]);
+			}
 			break;
-		
+		}
     }
 
 

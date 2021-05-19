@@ -19,7 +19,7 @@ void MONITOR_init(Monitor* monitor,int num_Countries)
     
 }
 
-void MONITOR_print_all(Monitor *monitor, unsigned int numMonitors)
+void MONITOR_print_all(Monitor* monitor, unsigned int numMonitors)
 {
     printf("---------------------------------\n");
     for (int i = 0; i < numMonitors; i++)
@@ -32,6 +32,21 @@ void MONITOR_print_all(Monitor *monitor, unsigned int numMonitors)
 		
 	}
 }
+
+int MONITOR_search_country(Monitor* monitor, char* country, unsigned int numMonitors)
+{
+    for (int i = 0; i < numMonitors; i++)
+	{
+		for (int j = 0; j < monitor[i].numCountries; j++)
+		{
+            if(strcmp(monitor[i].countries[j], country) == 0)
+                return i;
+		}		
+	}
+    return -1;
+}
+
+
 
 void MONITOR_destroy(Monitor* monitor)
 {

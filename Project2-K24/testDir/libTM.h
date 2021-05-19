@@ -12,7 +12,9 @@ typedef struct Monitor{
 
 void MONITOR_init(Monitor* monitor,int numCountries);
 
-void MONITOR_print_all(Monitor *monitor, unsigned int numMonitors);
+void MONITOR_print_all(Monitor* monitor, unsigned int numMonitors);
+
+int MONITOR_search_country(Monitor* monitor, char* country, unsigned int numMonitors);
 
 void MONITOR_destroy(Monitor* monitor);
 
