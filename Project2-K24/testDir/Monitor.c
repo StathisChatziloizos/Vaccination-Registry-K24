@@ -292,22 +292,100 @@ int main(int argc, char** argv)
 
 	while (1)
 	{
-		if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
+		if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2-Monitor");    return -1;}
 		if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		if(read(fd2, command, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
-		close(fd2);
-		fflush(stdout);
+		// printf("here\n");
+		// close(fd2);
+		// fflush(stdout);
 
 
-		// printf("command: %s\n", command);
 		if (strcmp(command,"exit")==0)
 		{
+			// printf("Exit - PID = %d - FIFO %s - ID %d\n",getpid(),fifo2, fd2);
 			break;
+		}
+		else if(strcmp(command,"searchVaccinationStatus")==0)
+		{
+			// close(fd2);
+			// if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2-Monitor");    return -1;}
+
+
+			// printf("SearchVacc - PID = %d - FIFO %s - ID %d\n",getpid(),fifo2, fd2);
+			if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+			if(read(fd2, citizen_id, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+			close(fd2);
+
+			// printf("CID %s - PID = %d\n",citizen_id, getpid());
+			record* requested_citizen;
+			if((requested_citizen=HASH_exists(&record_hash_table, citizen_id))!=NULL)
+			{
+				// printf("CitizenID %s is here\n",citizen_id);
+				
+
+
+
+				writeBytes = strlen(requested_citizen->first_name) +1;
+				// Apostolh first_name
+				if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
+				if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd1,requested_citizen->first_name, writeBytes)) == -1)    {perror("write");   return -1;}
+
+				// Apostolh last_name
+				writeBytes = strlen(requested_citizen->last_name) +1;
+				if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd1,requested_citizen->last_name, writeBytes)) == -1)    {perror("write");   return -1;}
+
+				// Apostolh xwras
+				writeBytes = strlen(requested_citizen->country_name) +1;
+				if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd1,requested_citizen->country_name, writeBytes)) == -1)    {perror("write");   return -1;}
+
+				// Apostolh hlikias
+				if((nwrite = write(fd1,&requested_citizen->age, sizeof(int))) == -1)    {perror("write");   return -1;}
+
+				// // Anazhthsh stis skil lists olwn twn iwn
+				for(i=0;i<num_of_viruses;i++)
+				{
+									
+					skip_lst_node=SKIP_LIST_search(array_of_viruses[i]->vacc_list,atoi(citizen_id));
+					
+					//  Emfanizoyme to apotelesma ths anazhthshs
+					if(skip_lst_node)
+					{
+						
+						printf("%s YES %s\n",array_of_viruses[i]->virus,skip_lst_node->date);
+						
+					}
+					else{
+						
+						printf("%s NO\n",array_of_viruses[i]->virus);//skip_lst_node->date);
+												
+					}									
+				}				
+
+
+
+				close(fd1);
+
+			}
+
+
+
+			// printf("citizenID = %s   - PID = %d\n", citizen_id,getpid());
+
+
+		}
+		else if (strcmp(command,"continue")==0)
+		{
+			// printf("continue ivoked\n");
+			continue;
 		}
 		else if (strcmp(command,"travelRequest")==0)
 		{
+			char reply[12];
 			// printf("M:fd2 %d\n",fd2);
-			if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
+			// if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
 			// printf("here\n");
 			if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 			// printf("Readbytes %d\n",readBytes);
@@ -318,7 +396,7 @@ int main(int argc, char** argv)
 			if(read(fd2, virus_name, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
 			close(fd2);
 
-			printf("CitizenID %s, Virus Name %s\n", citizen_id, virus_name);
+			// printf("CitizenID %s, Virus Name %s\n", citizen_id, virus_name);
 
 			// Anazhtoyme ton komvo toy ioy sto dentro
 			virus_node=BST_search(virus_tree,virus_name);
@@ -332,15 +410,31 @@ int main(int argc, char** argv)
 				//  Emfanizoyme to apotelesma ths anazhthshs
 				if(skip_lst_node)
 				{
+					strcpy(reply, "YES");
+					writeBytes = strlen(reply) +1;
+
+					if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
+					if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd1,reply, writeBytes)) == -1)    {perror("write");   return -1;}
 					
-					printf("VACCINATED ON %s\n",skip_lst_node->date);
+					strcpy(reply,skip_lst_node->date);
+					writeBytes = strlen(reply) +1;
+					if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd1,reply, writeBytes)) == -1)    {perror("write");   return -1;}
+					close(fd1);
 					
 				}
 				else
 				{
+					// Not vaccinated
 					
-					printf("NOT VACCINATED\n");							
-					
+					strcpy(reply, "NO");
+					writeBytes = strlen(reply) +1;
+
+					if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
+					if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd1,reply, writeBytes)) == -1)    {perror("write");   return -1;}
+					close(fd1);
 				}					
 				
 			}

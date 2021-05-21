@@ -8,6 +8,8 @@
 #include <sys/wait.h>
 #include <dirent.h>
 #include <math.h>
+#include <sys/select.h>
+// #include <time.h>
 
 
 
@@ -45,6 +47,7 @@ int main(int argc, char** argv)
 	char* virus_name;
 	char* vaccination_condition;
 	char* date;
+	char* date2;
 
 	// To string poy ginetai hash sto bloom filter
 	unsigned char bloom_string[BLOOM_STRING_MAX_LENGTH];
@@ -138,6 +141,10 @@ int main(int argc, char** argv)
 	
 	// Takshnomish toy pinaka xwrwn alfabhtika
 	qsort(&countries[0], counter, sizeof(char *), comparator);
+
+	// Ta Monitos mporei na einai to poly oses kai oi xwres
+	if(num_Monitors > counter)
+		num_Monitors=counter;
 
 	// for (int i = 0; i < counter; i++)
 	// {
@@ -302,7 +309,17 @@ int main(int argc, char** argv)
 	// }
 
 	// usleep(50000);
-	MONITOR_print_all(monitor,num_Monitors);
+	// MONITOR_print_all(monitor,num_Monitors);
+	// int* accepted = (int*)malloc(counter * sizeof(int));
+	// int* rejected = (int*)malloc(counter * sizeof(int));
+	// for (int i = 0; i < counter; i++)
+	// {
+	// 	accepted[i]=0;
+	// 	rejected[i]=0;
+	// }
+	int requestNum=0;
+	Request* requests = (Request*)malloc(sizeof(Request));
+	// printf("counter is %d\n",counter);
  
     while(1)
 	{
@@ -311,6 +328,10 @@ int main(int argc, char** argv)
 	
 		// Diavasma entolhs xrhsth
 		fgets(inner_menu_line,INNER_MENU_LINE_LENGTH-1,stdin);
+		if (strcmp(inner_menu_line,"\n")==0)
+		{
+			continue;
+		}
 	
 		// Anagnwrish entolhs
 		command_name = strtok(inner_menu_line," \t\n");
@@ -338,57 +359,27 @@ int main(int argc, char** argv)
 			}
 			else
 			{
-				int countryIndex = MONITOR_search_country(monitor, country_from, num_Monitors);
-				if (countryIndex == -1)
+				int countryFromIndex = MONITOR_search_country(monitor, country_from, num_Monitors);
+				int countryToIndex = MONITOR_search_country(monitor, country_to, num_Monitors);
+				if (countryFromIndex == -1)
 				{
-					printf("This country doesn't exist: %s \n", country_from);
+					printf("This country(countryFrom) doesn't exist: %s \n", country_from);
 					continue;
 				}
-				
-				printf("Monitor %d\n", countryIndex);
-
-
-				// printf("TM:fd2 %d\n",fd2[countryIndex]);
-				// Apostolh travelRequest command
-				if((fd2[countryIndex] = open(fifo2[countryIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-
-				writeBytes = strlen(command_name) +1;
-				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-				if((nwrite = write(fd2[countryIndex],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
-				close(fd2[countryIndex]);
-				// usleep(1);
-				if((fd2[countryIndex] = open(fifo2[countryIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-				writeBytes = strlen(citizen_id) +1;
-				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-				if((nwrite = write(fd2[countryIndex],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}
-
-				writeBytes = strlen(virus_name) +1;
-				if((nwrite = write(fd2[countryIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-				if((nwrite = write(fd2[countryIndex],virus_name, writeBytes)) == -1)    {perror("write");   return -1;}
-				close(fd2[countryIndex]);
-
-			}
-			printf("\n");
-		}
-		
-		
-		// vaccineStatusBloom //
-		else if(strcmp(command_name,"vaccineStatusBloom")==0)
-		{			
-			// Diavasma orismatwn
-			citizen_id=strtok(NULL," \t\n");
-			virus_name=strtok(NULL," \t\n");
+				if (countryToIndex == -1)
+				{
+					printf("This country(countryTo) doesn't exist: %s \n", country_to);
+					continue;
+				}
 			
-			// Elegxos gia elliph orismata
-			if(virus_name==NULL)
-			{
-				
-				printf("Missing argument\n");
-				
-			}
-			else
-			{
-							
+				requestNum++;
+				requests = (Request*)realloc(requests,requestNum * sizeof(Request));
+				strcpy(requests[requestNum-1].countryTo,country_to);
+				strcpy(requests[requestNum-1].virus_name,virus_name);
+				strcpy(requests[requestNum-1].date,date);
+
+
+
 				for(i=0;i<16;i++)
 				{
 					// Kataskeyh string poy tha ginei hash
@@ -398,11 +389,13 @@ int main(int argc, char** argv)
 					bit_position=BLOOM_hash(bloom_string,i);
 					// Ean h thesh den einai set o citizen den einai emvoliasmenos
 
-					// ------------------ TODO: I check only for the last Monitor ----------------------------------------
-					if(BLOOM_get(&bloom[0],bit_position)==0)
+					if(BLOOM_get(&bloom[countryFromIndex],bit_position)==0)
 					{
 						
-						printf("NOT VACCINATED\n");												
+						printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n");
+						requests[requestNum-1].outcome=0;
+
+						// rejected[countryToIndex] ++;											
 					
 						// To i ginetai 0 kai ginetai break
 						i=0;
@@ -417,13 +410,308 @@ int main(int argc, char** argv)
 				if(i!=0)
 				{
 					
-					printf("MAYBE\n");	
+					// printf("MAYBE\n");	
 					
+				
+					char reply[12];
+					// printf("TM:fd2 %d\n",fd2[countryFromIndex]);
+					// Apostolh travelRequest command
+					if((fd2[countryFromIndex] = open(fifo2[countryFromIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+
+					writeBytes = strlen(command_name) +1;
+					if((nwrite = write(fd2[countryFromIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd2[countryFromIndex],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+					// close(fd2[countryFromIndex]);
+					// usleep(1);
+					// if((fd2[countryFromIndex] = open(fifo2[countryFromIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+					writeBytes = strlen(citizen_id) +1;
+					if((nwrite = write(fd2[countryFromIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd2[countryFromIndex],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}
+
+					writeBytes = strlen(virus_name) +1;
+					if((nwrite = write(fd2[countryFromIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd2[countryFromIndex],virus_name, writeBytes)) == -1)    {perror("write");   return -1;}
+					close(fd2[countryFromIndex]);
+
+
+					if((fd1[countryFromIndex] = open(fifo1[countryFromIndex], O_RDONLY)) < 0 )     {perror("Open fifo1-TravelMonitor");    return -1;}
+					if(read(fd1[countryFromIndex],&readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+					if(read(fd1[countryFromIndex],reply, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh apanthshs
+
+					if(strcmp(reply,"NO")==0)
+					{
+						close(fd1[countryFromIndex]);
+						printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n");
+						requests[requestNum-1].outcome=0;
+						// rejected[countryToIndex] ++;
+					}
+					else if(strcmp(reply,"YES")==0)
+					{
+						int req_year, req_month, req_day;
+						sscanf(date,"%d-%d-%d",&req_day,&req_month,&req_year);
+						// printf("Curr: %d/%d/%d\n",req_day,req_month,req_year);
+
+
+						int vacc_day, vacc_month, vacc_year;
+
+						if(read(fd1[countryFromIndex],&readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+						if(read(fd1[countryFromIndex],reply, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+						close(fd1[countryFromIndex]);
+						sscanf(reply,"%d-%d-%d",&vacc_day,&vacc_month,&vacc_year);
+						// printf("Received: %d/%d/%d\n",vacc_day,vacc_month,vacc_year);
+						
+						if (req_day < vacc_day)
+						{
+							req_day += 30;
+							req_month --;
+						}
+						if (req_month < vacc_month)
+						{
+							req_month += 12;
+							req_year --;
+						}
+						
+						vacc_day=req_day-vacc_day;
+						vacc_month=req_month-vacc_month;
+						vacc_year=req_year-vacc_year;
+						// printf("Difference: %d/%d/%d\n",vacc_day,vacc_month,vacc_year);
+
+						if (vacc_year >0)
+						{
+							// Den emvoliasthke ton teleytaio xrono
+							printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n");
+							requests[requestNum-1].outcome=0;
+							// rejected[countryToIndex] ++;
+
+						}
+						else if(vacc_year == 0)
+						{
+							if (vacc_month > 6 ||(vacc_month == 6 && vacc_day > 0))
+							{
+								// Den emvoliasthke edw kai 6 mhnes
+								printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n");
+								requests[requestNum-1].outcome=0;
+								// rejected[countryToIndex] ++;
+
+							}
+							else if (vacc_month < 6 ||(vacc_month == 6 && vacc_day == 0))
+							{
+								// Emvoliasthke toys teleytaioys 6 mhnes
+								printf("REQUEST ACCEPTED – HAPPY TRAVELS\n");
+								requests[requestNum-1].outcome=1;
+								// accepted[countryToIndex] ++;
+
+							}
+						}
+						else
+						{
+							printf("Person vaccinated on a date after the intended trip!!! Program calculates 6 months in the past from the date given\n");
+							requests[requestNum-1].outcome=0;
+						}
+						
+								
+					}
+				}
+
+			}
+
+		}
+		// travelStats //
+		else if(strcmp(command_name,"travelStats")==0)
+		{
+			// Diavasma orismatwn
+			virus_name=strtok(NULL," \t\n");
+			date=strtok(NULL," \t\n");
+			date2=strtok(NULL," \t\n");
+			country_to=strtok(NULL," \t\n");
+
+			// Elegxos gia elliph orismata
+			if(date2==NULL)
+			{
+				
+				printf("Missing argument\n");
+				continue;
+
+			}
+
+			// An den exoyn ginei akoma requests
+			if (requestNum == 0)
+			{
+				printf("No requests yet!\n");
+				continue;
+			}
+
+			int accepts=0, rejects=0;			
+
+			// Gia oles tis xwres
+			if (country_to == NULL)
+			{
+
+				// Gia ola ta requests
+				for (int i = 0; i < requestNum; i++)
+				{
+					// An o ios einai o swstos
+					if(strcmp(requests[i].virus_name,virus_name) == 0)
+					{
+						// An h hmeromhnia toy request einai anamesa sta dates poy do8hkan
+						if(is_between_date(requests[i].date,date,date2))
+						{
+							// An to request egine accept
+							if(requests[i].outcome == 1)
+							{
+								accepts ++;
+							}
+							// An to request egine reject
+							else
+							{
+								rejects ++;
+							}
+							
+						}
+					}
 				}
 				
-			
+				printf("TOTAL REQUESTS %d\n",accepts+rejects);
+				printf("ACCEPTED %d\n",accepts);
+				printf("REJECTED %d\n",rejects);
+				
 			}
+			else
+			{
+				// Gia oles tis xwres
+				for (int i = 0; i < requestNum; i++)
+				{
+					// An h xwra einai h swsth
+					if(strcmp(requests[i].countryTo,country_to) == 0)
+					{
+						// An o ios einai o swstos
+						if(strcmp(requests[i].virus_name,virus_name) == 0)
+						{
+							// An h hmeromhnia toy request einai anamesa stis hmeromhnies poy do8hkan
+							if(is_between_date(requests[i].date,date,date2))
+							{
+								// An to request egine accept
+								if(requests[i].outcome == 1)
+								{
+									accepts ++;
+								}
+								// An to request egine reject
+								else
+								{
+									rejects ++;
+								}
+								
+							}
+						}
+					}
+				}
+				
+				printf("TOTAL REQUESTS %d\n",accepts+rejects);
+				printf("ACCEPTED %d\n",accepts);
+				printf("REJECTED %d\n",rejects);
+
+
+				// int countryToIndex = MONITOR_search_country(monitor, country_to, num_Monitors);
+				// printf("TOTAL REQUESTS %d\n",accepted[countryToIndex]+rejected[countryToIndex]);
+				// printf("ACCEPTED %d\n",accepted[countryToIndex]);
+				// printf("REJECTED %d\n",rejected[countryToIndex]);
+
+			}
+			
+			
+
+			
+
+		}
+
+		// searchVaccinationStatus //
+		else if(strcmp(command_name,"searchVaccinationStatus")==0)
+		{
+			// Diavasma orismatos
+			citizen_id=strtok(NULL," \t\n");
+
+			if(citizen_id == NULL)
+			{
+				printf("Missing citizen_id argument\n");
+				continue;
+			}
+
+			writeBytes = strlen(command_name) +1;
+			int citizen_id_length = strlen(citizen_id) +1;
+			for(i=0; i < num_Monitors; i++)
+			{
+				// Apostolh searchVaccinationStatus command sta Monitors
+				if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+				if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[i],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				
+				// Apostolh citizen_id sta Monitors
+				if((nwrite = write(fd2[i],&citizen_id_length, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[i],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}
+				close(fd2[i]);
+
+				
+			}
+
+			int age_of_citizen;
+			fd_set fds;
+			struct timeval tv;
+			tv.tv_usec = 50000;  
+			tv.tv_sec = 0;
+			FD_ZERO(&fds);
+
+			for (int i = 0; i < num_Monitors; i++)
+			{
+				if((fd1[i] = open(fifo1[i], O_RDONLY | O_NONBLOCK)) < 0 )     {perror("Open fifo1TravelMonitor");    return -1;}
+				FD_SET(fd1[i],&fds);
+			}
+			select(fd1[num_Monitors-1]+1, &fds, NULL, NULL, &tv);
+			for (int i = 0; i < num_Monitors; i++)
+			{
+				if (FD_ISSET(fd1[i], &fds))
+				{
+					// printf("Monitor %d is set\n",i);
+					// Lhpsh first_name
+					if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+					first_name=(char*)malloc(readBytes*sizeof(char));
+					if(read(fd1[i], first_name, readBytes) < 0)     {perror("read");    return -1;}	
 					
+					//Lhpsh last_name 
+					if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+					last_name=(char*)malloc(readBytes*sizeof(char));
+					if(read(fd1[i], last_name, readBytes) < 0)     {perror("read");    return -1;}	
+
+					//Lhpsh xwras 
+					if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+					country_from=(char*)malloc(readBytes*sizeof(char));
+					if(read(fd1[i], country_from, readBytes) < 0)     {perror("read");    return -1;}	
+
+					// Lhpsh hlikias
+					if(read(fd1[i], &age_of_citizen, sizeof(int)) < 0)     {perror("read");    return -1;}
+
+
+
+					printf("fn: %s, ln: %s, c: %s, age: %d\n",first_name, last_name, country_from, age_of_citizen);
+
+
+					break;
+				}
+				
+				// printf("fd1[%d] = %d\n",i, fd1[i]);
+			}
+			for (int i = 0; i < num_Monitors; i++)
+			{
+				close(fd1[i]);
+			}
+			free(first_name);
+			free(last_name);
+			free(country_from);
+			// for(i=0; i < num_Monitors; i++)
+			// {
+			// 	usleep(5000);
+				// close(fd2[i]);
+			// }
+
 		}
         	
 		// exit //
@@ -437,10 +725,50 @@ int main(int argc, char** argv)
 				if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 				if((nwrite = write(fd2[i],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
 				close(fd2[i]);
+				
 			}
+			// for(i=0; i < num_Monitors; i++)
+			// {
+			// 	// printf("fd2[%d] = %d",i , fd2[i]);
+			// 	close(fd2[i]);
+			// }
 			break;
 		}
+		// printMonitors
+		else if(strcmp(command_name,"printMonitors")==0)
+		{
+			MONITOR_print_all(monitor,num_Monitors);
+		}
+
+		// continue //
+		else if(strcmp(command_name,"continue")==0)
+		{
+			writeBytes = strlen(command_name) +1;
+			for(i=0; i < num_Monitors; i++)
+			{
+				// Apostolh continue command
+				if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+				if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(fd2[i],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				close(fd2[i]);
+			}
+			printf("CONTINUE\n");
+			continue;
+		}
     }
+
+	// To travel Monitor perimenei ta paidia toy na oloklhrwsoyn
+	for (int i = 0; i < num_Monitors; i++)
+	{
+		wait(NULL);
+	}
+
+
+	for (int i = 0; i < requestNum; i++)
+	{
+		printf("%d. %s %s %d - %s\n",i,requests[i].countryTo,requests[i].virus_name,requests[i].outcome,requests[i].date);
+	}
+	
 
 
 	// Elef8erwsh mnhmhs
@@ -458,6 +786,9 @@ int main(int argc, char** argv)
 		BLOOM_destroy(&bloom[i]);
 		MONITOR_destroy(&monitor[i]);
 	}
+	free(requests);
+	// free(accepted);
+	// free(rejected);
 	free(bloom);
 	free(monitor);
 	free(fifo1);
