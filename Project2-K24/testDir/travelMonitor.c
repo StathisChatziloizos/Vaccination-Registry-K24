@@ -658,6 +658,9 @@ int main(int argc, char** argv)
 			struct timeval tv;
 			tv.tv_usec = 50000;  
 			tv.tv_sec = 0;
+			int select_success_flag = 0;
+			int num_of_viruses = 0;
+
 			FD_ZERO(&fds);
 
 			for (int i = 0; i < num_Monitors; i++)
@@ -689,9 +692,52 @@ int main(int argc, char** argv)
 					// Lhpsh hlikias
 					if(read(fd1[i], &age_of_citizen, sizeof(int)) < 0)     {perror("read");    return -1;}
 
+					// Lhpsh ari8moy iwn
+					if(read(fd1[i], &num_of_viruses, sizeof(int)) < 0)     {perror("read");    return -1;}
+
+					// Shmaia epityxias select ginetai 1
+					select_success_flag = 1;
+
+					// printf("fn: %s, ln: %s, c: %s, age: %d\n",first_name, last_name, country_from, age_of_citizen);
+					// printf("num_of_viruses %d\n", num_of_viruses);
+					printf("%s %s %s %s\n",citizen_id, first_name, last_name, country_from);
+					printf("AGE %d\n",age_of_citizen);
+
+					// Afairesh O_NONBLOCK flag apo to fd
+					int flags = fcntl(fd1[i], F_GETFL);
+					flags &= ~O_NONBLOCK;
+					fcntl(fd1[i], F_SETFL, flags);
+
+					for(int j=0;j<num_of_viruses;j++)
+					{
+						unsigned short reply_bool;
+						//Lhpsh ioy 
+						if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+						virus_name=(char*)malloc(readBytes*sizeof(char));
+						if(read(fd1[i], virus_name, readBytes) < 0)     {perror("read");    return -1;}	
 
 
-					printf("fn: %s, ln: %s, c: %s, age: %d\n",first_name, last_name, country_from, age_of_citizen);
+						// lhpsh apanthshs emvoliasmoy
+						if(read(fd1[i], &reply_bool, sizeof(short)) < 0)     {perror("read");    return -1;}
+						if (reply_bool)
+						{
+							//Lhpsh hmeromhnias emvoliasmoy 
+							if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+							date=(char*)malloc(readBytes*sizeof(char));
+							if(read(fd1[i], date, readBytes) < 0)     {perror("read");    return -1;}	
+
+							printf("%s  VACCINATED ON  %s\n",virus_name , date);
+
+							free(date);
+						}
+						else
+						{
+							printf("%s  NOT YET VACCINATED\n",virus_name);
+						}
+						
+						
+						free(virus_name);
+					}
 
 
 					break;
@@ -703,9 +749,13 @@ int main(int argc, char** argv)
 			{
 				close(fd1[i]);
 			}
-			free(first_name);
-			free(last_name);
-			free(country_from);
+
+			if(select_success_flag)
+			{
+				free(first_name);
+				free(last_name);
+				free(country_from);
+			}
 			// for(i=0; i < num_Monitors; i++)
 			// {
 			// 	usleep(5000);

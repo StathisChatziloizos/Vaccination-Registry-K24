@@ -344,22 +344,44 @@ int main(int argc, char** argv)
 				// Apostolh hlikias
 				if((nwrite = write(fd1,&requested_citizen->age, sizeof(int))) == -1)    {perror("write");   return -1;}
 
+				// Apostolh ari8moy iwn
+				if((nwrite = write(fd1,&num_of_viruses, sizeof(int))) == -1)    {perror("write");   return -1;}
+
 				// // Anazhthsh stis skil lists olwn twn iwn
 				for(i=0;i<num_of_viruses;i++)
 				{
+					unsigned short reply_bool;
 									
 					skip_lst_node=SKIP_LIST_search(array_of_viruses[i]->vacc_list,atoi(citizen_id));
 					
+					// Apostolh ioy
+					writeBytes = strlen(array_of_viruses[i]->virus) +1;
+					if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+					if((nwrite = write(fd1,array_of_viruses[i]->virus, writeBytes)) == -1)    {perror("write");   return -1;}
+
 					//  Emfanizoyme to apotelesma ths anazhthshs
 					if(skip_lst_node)
 					{
-						
-						printf("%s YES %s\n",array_of_viruses[i]->virus,skip_lst_node->date);
+						// Apostolh 8etikhs apanthshs emvoliasmoy
+						reply_bool = 1;
+						if((nwrite = write(fd1,&reply_bool, sizeof(short))) == -1)    {perror("write");   return -1;}
+
+						// Apostolh hmeromhnias emvoliasmoy
+						writeBytes = strlen(skip_lst_node->date) +1;
+						if((nwrite = write(fd1,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+						if((nwrite = write(fd1,skip_lst_node->date, writeBytes)) == -1)    {perror("write");   return -1;}
+
+
+						// printf("%s YES %s\n",array_of_viruses[i]->virus,skip_lst_node->date);
 						
 					}
 					else{
-						
-						printf("%s NO\n",array_of_viruses[i]->virus);//skip_lst_node->date);
+						// Apostolh arnhtikhs apanthshs emvoliasmoy
+						reply_bool = 0;
+						if((nwrite = write(fd1,&reply_bool, sizeof(short))) == -1)    {perror("write");   return -1;}
+
+
+						// printf("%s NO\n",array_of_viruses[i]->virus);//skip_lst_node->date);
 												
 					}									
 				}				
