@@ -9,7 +9,6 @@
 #include <dirent.h>
 #include <math.h>
 #include <sys/select.h>
-// #include <time.h>
 
 
 
@@ -17,24 +16,13 @@
 #include "libTM.h"
 
 #define INNER_MENU_LINE_LENGTH 200
-#define FILE_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
-// #define BUFFER_SIZE 2
 
-const int pipeSize = 512;
 
 static int flag = 0;
 
-void int_quit_parent()
-{
-	flag=1;
-}
-
-int comparator(const void *str1, const void *str2)
-{
-	int result = strcmp(*(const char **) str1, *(const char **) str2);
-    return result;
-}
+// Synarthsh poy diaxeirizetai ta SIGINT/SIGQUIT toy travelMonitor
+void int_quit_parent();
 
 int main(int argc, char** argv)
 {
@@ -65,9 +53,6 @@ int main(int argc, char** argv)
 
 	// Eswterikh grammh entolwn
 	char inner_menu_line[INNER_MENU_LINE_LENGTH];	
-	
-	// Grammh arxeioy
-	char file_line[FILE_LINE_LENGTH];
 
 	// To megethos toy buffer
 	unsigned int buffer_size;
@@ -75,16 +60,17 @@ int main(int argc, char** argv)
 	// O ari8mos Monitor diergasiwn
 	unsigned int num_Monitors; 
 
+	// Deikths se Bloom struct
     Bloom* bloom;
+
 	// To megethos bloom filtroy
     unsigned long bloom_size;
 
+	// Boh8htikes metablhtes gia prospelash katalogwn
 	char* directoryName;
     DIR* dir_ptr;
     struct dirent* dir;
 
-    // int fd1, fd2;
-    // char msgbuf[BUFFER_SIZE+1];
 
 	// Pinakas xwrwn
 	char* countries[200];
@@ -95,13 +81,11 @@ int main(int argc, char** argv)
 	// Boh8htikh metablhth
 	unsigned int counter = 0;
 
-	unsigned int countries_per_Monitor;
-
+	// Boh8htikh metablhth gia apostolh/lhpsh megalwn mhnymatwn
 	unsigned long offset = 0;
 
+	// Deikths se domh Monitor
 	Monitor* monitor;
-
-
 
 	// Elegxoi orismatwn ekteleshs programmatos
 	if(argc!=9)
@@ -129,14 +113,14 @@ int main(int argc, char** argv)
 	// Ka8orismos toy input_dir
 	directoryName = argv[8];
 
-	// Gemisma toy pinaka xwrwn me tis xwres toy in
+	// Gemisma toy pinaka xwrwn me tis xwres toy directory
     if((dir_ptr = opendir(directoryName)) == NULL) 		{perror("Open Dir"); 	return -1;}
 	while((dir = readdir(dir_ptr)) != NULL )
     {
 		// Agnohse to current kai to parent directory
 		if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
 			continue;
-		// countries[counter] = dir->d_name;
+
 		countries[counter] = (char*) malloc (strlen(dir->d_name)+1);
         strcpy (countries[counter],dir->d_name);
 		counter ++;
@@ -151,13 +135,6 @@ int main(int argc, char** argv)
 	if(num_Monitors > counter)
 		num_Monitors=counter;
 
-	// for (int i = 0; i < counter; i++)
-	// {
-	// 	printf("countries[%d] = %s\n",i, countries[i]);
-	// }
-	
-
-	// printf("countries[3] = %s\n",countries[3]);
 	
 	// Elegxos megethoys bloom filtroy
 	if(bloom_size<=0){
@@ -170,14 +147,12 @@ int main(int argc, char** argv)
 	// Desmeysh mnhmhs gia ta Monitors
 	monitor = (Monitor*)malloc(num_Monitors * sizeof(Monitor));
 
+	// Desmeysh mnhmhs enos pinaka apo Bloom kai arxikopoihsh toys 
 	bloom = (Bloom*)malloc(num_Monitors * sizeof(Bloom));
 	for (int i = 0; i < num_Monitors; i++)
 	{
 		BLOOM_init(&bloom[i], bloom_size);
 	}
-
-	// char* fifo1 = "fifo1";
-	// char* fifo2 = "fifo2";
 
 	// Dhmiourgia array gia apo8hkeysh twn file descriptors, 2 ana Monitor (1Read/1Write)
 	unsigned int* fd1 = (unsigned int*)malloc(num_Monitors * sizeof(int));
@@ -198,19 +173,10 @@ int main(int argc, char** argv)
 
 		if(mkfifo(fifo1[i],0666) == -1)     {perror("mkfifo");    return -1;}
 		if(mkfifo(fifo2[i],0666) == -1)     {perror("mkfifo");    return -1;}
-		// printf("fifo1[%d] = %s, fifo2[%d] = %s\n", i, fifo1[i], i, fifo2[i]);
 	}
 	
 
-
-
-    // if((fd2 = open(fifo2, O_RDWR | O_NONBLOCK)) < 0 )     {perror("Open fifo2");    return -1;}
-
-	// printf("Counter = %d\n", counter);
-	countries_per_Monitor = ceil((float)counter / num_Monitors);
-	// printf("countriesPerMonitor = %d\n", countries_per_Monitor);
-
-
+	// Fork - Dhmioyrgia Monitors
     pid_t pid[num_Monitors];
     for (int i = 0; i < num_Monitors; i++)
     {
@@ -219,22 +185,21 @@ int main(int argc, char** argv)
         if (pid[i] < 0)     {perror("Fork ");    return -1;}
         if (pid[i] == 0)
         {
-			// printf("pid==0 HERE\n");
-            char* arg="hey" ;
-            // sprintf(arg,"%d-Message", i);
             char* args[] = {"./Monitor", fifo1[i], fifo2[i] , NULL};
             execv(args[0], args);   //exec ./Monitor
         }
     }
 
+	// Metrhths
 	int i;
+
+	// Desmeysh mnhmhs subdirectory
 	subdirectory = (char*)malloc(50 * sizeof(char));
 	
 
-
     for(i=0; i < num_Monitors; i++)
     {
-		// Reset offset
+		// Reset metablhtwn
 		offset = 0;
 		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0, num_Countries = 0;
 
@@ -242,6 +207,7 @@ int main(int argc, char** argv)
 		{	
 			num_Countries++;
 		}
+		// Arxikopoihsh monitor
 		MONITOR_init(&monitor[i], num_Countries);
 		unsigned int position = 0;
 		for (int j = i; j <= counter-1; j+=num_Monitors)
@@ -250,8 +216,7 @@ int main(int argc, char** argv)
 			position++;
 		}
 
-
-		// Apostolh buffer size, subdirectory, bloom_size
+		// Apostolh buffer size kai ari8moy xwrwn
 		if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 		if((nwrite = write(fd2[i],&buffer_size, sizeof(int))) == -1)    {perror("write");   return -1;}
 		if((nwrite = write(fd2[i],&monitor[i].numCountries, sizeof(int))) == -1)    {perror("write");   return -1;}
@@ -266,63 +231,48 @@ int main(int argc, char** argv)
 			strcat(subdirectory,monitor[i].countries[j]);
 			writeBytes = strlen(subdirectory) + 1;
 
-			// printf("Sending subdirectory %s\n",subdirectory);
+			// Apostolh subdirectory
 			if((nwrite = write(fd2[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-			if((nwrite = write(fd2[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}		//Apostolh subdirectory
+			if((nwrite = write(fd2[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}
 		}
-		if((nwrite = write(fd2[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}		//Apostolh bloom_size
+
+		// Apostolh bloom_size
+		if((nwrite = write(fd2[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}
 		close(fd2[i]);
 
 		// Lhpsh bloom filter
 		if((fd1[i] = open(fifo1[i], O_RDONLY)) < 0 )     {perror("Open fifo1");    return -1;}
         if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 		offset = 0;
+
+		// Lhpsh toy bloom filter apo to Monitor
+		// H lhpsh ginetai se tmhmata ta opoia ka8orizei to buffer_size
+		// H metablhth offset krataei ka8e fora ton ari8mo twn bytes poy exoun hdh paralhf8ei
 		while(offset < bloom[i].size)
 		{
 			if(offset + buffer_size > bloom[i].size)
 			{
-				if((nread = read(fd1[i], bloom[i].filter + offset, bloom[i].size - offset)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+				if((nread = read(fd1[i], bloom[i].filter + offset, bloom[i].size - offset)) <= 0)     {perror("read");    return -1;}
 				break;
 			}
-			if((nread = read(fd1[i], bloom[i].filter + offset, buffer_size)) <= 0)     {perror("read");    return -1;}		// Apostolh Bloom Filter sto Monitor
+			if((nread = read(fd1[i], bloom[i].filter + offset, buffer_size)) <= 0)     {perror("read");    return -1;}
 			offset += nread;
 		}
-		// printf("offset is %d\n", offset);
 
 		close(fd1[i]);
-		// printf("%s\n", bloom.filter);
+
 		readBytes = strlen(bloom[i].filter);
-		// if(read(fd1, &bloom, sizeof(bloom)) < 0)     {perror("read");    return -1;}
 
-
-        // printf("Message Received: %s - %d - %s\n", bloom.filter, bloom.size, bloom.test);
         fflush(stdout);
     }
 
-	// for (int i = 0; i < num_Monitors; i++)
-	// {
-	// 	if(strcmp(bloom[0].filter, bloom[i].filter) != 0)
-	// 		printf(" ----- bloom[%d] is WRONG\n",i);
-	// }
-
-	// usleep(50000);
-	// MONITOR_print_all(monitor,num_Monitors);
-	// int* accepted = (int*)malloc(counter * sizeof(int));
-	// int* rejected = (int*)malloc(counter * sizeof(int));
-	// for (int i = 0; i < counter; i++)
-	// {
-	// 	accepted[i]=0;
-	// 	rejected[i]=0;
-	// }
 	int requestNum=0;
+
+	// Desmeysh mnhmhs gia ta requests
 	Request* requests = (Request*)malloc(sizeof(Request));
-	for (int i = 0; i < num_Monitors; i++)
-	{
-		printf("Pid[%d] = %d\n",i, pid[i]);
-	}
 	
-	// printf("counter is %d\n",counter);
- 
+
+	// Efoson den exei ypsw8ei h shmaia apo SIGINT/SIGQUIT h apo exit command
     while(!flag)
 	{
 		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0;
@@ -339,7 +289,6 @@ int main(int argc, char** argv)
 		command_name = strtok(inner_menu_line," \t\n");
 		
 
-
 		//  Voi8htiko command poy ka8arizei thn o8onh
 		if(strcmp(command_name,"clear")==0)
 			system("clear");
@@ -353,6 +302,7 @@ int main(int argc, char** argv)
 			country_from=strtok(NULL," \t\n");
 			country_to=strtok(NULL," \t\n");
 			virus_name=strtok(NULL," \t\n");
+
 			if(virus_name==NULL)
 			{
 				
@@ -361,8 +311,10 @@ int main(int argc, char** argv)
 			}
 			else
 			{
+				// Briskei th 8esh thw xwras ston pinaka ton Monitors
 				int countryFromIndex = MONITOR_search_country(monitor, country_from, num_Monitors);
 				int countryToIndex = MONITOR_search_country(monitor, country_to, num_Monitors);
+
 				if (countryFromIndex == -1)
 				{
 					printf("This country(countryFrom) doesn't exist: %s \n", country_from);
@@ -375,7 +327,11 @@ int main(int argc, char** argv)
 				}
 			
 				requestNum++;
+
+				// Desmeysh mnhmhs request
 				requests = (Request*)realloc(requests,requestNum * sizeof(Request));
+
+				// Gemisma aparaithtwn stoixeiwn
 				strcpy(requests[requestNum-1].countryTo,country_to);
 				strcpy(requests[requestNum-1].virus_name,virus_name);
 				strcpy(requests[requestNum-1].date,date);
@@ -401,8 +357,6 @@ int main(int argc, char** argv)
 						close(fd2[countryToIndex]);
 
 						requests[requestNum-1].outcome=0;
-
-						// rejected[countryToIndex] ++;											
 					
 						// To i ginetai 0 kai ginetai break
 						i=0;
@@ -416,61 +370,61 @@ int main(int argc, char** argv)
 				// An to i den einai 0 o citizen einai pithanws emvoliasmenos
 				if(i!=0)
 				{
-					
-					// printf("MAYBE\n");	
-					
 				
 					char reply[12];
-					// printf("TM:fd2 %d\n",fd2[countryFromIndex]);
-					// Apostolh travelRequest command
-					if((fd2[countryFromIndex] = open(fifo2[countryFromIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 
+
+					// Apostolh travelRequest command sto Monitor poy diaxeirizetai to countryFrom
+					if((fd2[countryFromIndex] = open(fifo2[countryFromIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 					writeBytes = strlen(command_name) +1;
 					if((nwrite = write(fd2[countryFromIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 					if((nwrite = write(fd2[countryFromIndex],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
-					// close(fd2[countryFromIndex]);
-					// usleep(1);
-					// if((fd2[countryFromIndex] = open(fifo2[countryFromIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+
+					// Apostolh citizen_id
 					writeBytes = strlen(citizen_id) +1;
 					if((nwrite = write(fd2[countryFromIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 					if((nwrite = write(fd2[countryFromIndex],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}
 
+					// Aposolh onomatos ioy
 					writeBytes = strlen(virus_name) +1;
 					if((nwrite = write(fd2[countryFromIndex],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 					if((nwrite = write(fd2[countryFromIndex],virus_name, writeBytes)) == -1)    {perror("write");   return -1;}
 					close(fd2[countryFromIndex]);
 
-
+					// Lhpsh apanthshs
 					if((fd1[countryFromIndex] = open(fifo1[countryFromIndex], O_RDONLY)) < 0 )     {perror("Open fifo1-TravelMonitor");    return -1;}
 					if(read(fd1[countryFromIndex],&readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 					if(read(fd1[countryFromIndex],reply, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh apanthshs
 
 					if(strcmp(reply,"NO")==0)
 					{
+						// An h apanthsh einai arnhtikh
 						close(fd1[countryFromIndex]);
 						printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n");
+
+						// Stelnete -2 sto Monitor poy diaxeirizetai to countryTo
 						int rejection=-2;
 						if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 						if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
 						close(fd2[countryToIndex]);
+
 						requests[requestNum-1].outcome=0;
-						// rejected[countryToIndex] ++;
 					}
 					else if(strcmp(reply,"YES")==0)
 					{
+						// An h apanthsh einai 8etikh
 						int req_year, req_month, req_day;
 						sscanf(date,"%d-%d-%d",&req_day,&req_month,&req_year);
-						// printf("Curr: %d/%d/%d\n",req_day,req_month,req_year);
-
 
 						int vacc_day, vacc_month, vacc_year;
 
+						// Lhpsh hmeromhnias
 						if(read(fd1[countryFromIndex],&readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 						if(read(fd1[countryFromIndex],reply, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
 						close(fd1[countryFromIndex]);
 						sscanf(reply,"%d-%d-%d",&vacc_day,&vacc_month,&vacc_year);
-						// printf("Received: %d/%d/%d\n",vacc_day,vacc_month,vacc_year);
 						
+						// Elegxos gia ton xrono toy emvoliasmoy
 						if (req_day < vacc_day)
 						{
 							req_day += 30;
@@ -485,7 +439,6 @@ int main(int argc, char** argv)
 						vacc_day=req_day-vacc_day;
 						vacc_month=req_month-vacc_month;
 						vacc_year=req_year-vacc_year;
-						// printf("Difference: %d/%d/%d\n",vacc_day,vacc_month,vacc_year);
 
 						if (vacc_year >0)
 						{
@@ -497,7 +450,6 @@ int main(int argc, char** argv)
 							close(fd2[countryToIndex]);
 
 							requests[requestNum-1].outcome=0;
-							// rejected[countryToIndex] ++;
 
 						}
 						else if(vacc_year == 0)
@@ -506,32 +458,37 @@ int main(int argc, char** argv)
 							{
 								// Den emvoliasthke edw kai 6 mhnes
 								printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n");
+
+
+								// Stelnete -2 sto Monitor poy diaxeirizetai to countryTo
 								int rejection=-2;
 								if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 								if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
 								close(fd2[countryToIndex]);
 
 								requests[requestNum-1].outcome=0;
-								// rejected[countryToIndex] ++;
 
 							}
 							else if (vacc_month < 6 ||(vacc_month == 6 && vacc_day == 0))
 							{
 								// Emvoliasthke toys teleytaioys 6 mhnes
 								printf("REQUEST ACCEPTED – HAPPY TRAVELS\n");
+
+								// Stelnete -1 sto Monitor poy diaxeirizetai to countryTo
 								int acceptance=-1;
 								if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 								if((nwrite = write(fd2[countryToIndex],&acceptance, sizeof(int))) == -2)    {perror("write");   return -1;}
 								close(fd2[countryToIndex]);
 
 								requests[requestNum-1].outcome=1;
-								// accepted[countryToIndex] ++;
 
 							}
 						}
 						else
 						{
 							printf("Person vaccinated on a date after the intended trip!!! Program calculates 6 months in the past from the date given\n");
+
+							// Stelnete -2 sto Monitor poy diaxeirizetai to countryTo
 							int rejection=-2;
 							if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 							if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
@@ -643,16 +600,7 @@ int main(int argc, char** argv)
 				printf("REJECTED %d\n",rejects);
 
 
-				// int countryToIndex = MONITOR_search_country(monitor, country_to, num_Monitors);
-				// printf("TOTAL REQUESTS %d\n",accepted[countryToIndex]+rejected[countryToIndex]);
-				// printf("ACCEPTED %d\n",accepted[countryToIndex]);
-				// printf("REJECTED %d\n",rejected[countryToIndex]);
-
 			}
-			
-			
-
-			
 
 		}
 
@@ -688,6 +636,8 @@ int main(int argc, char** argv)
 			int age_of_citizen;
 			fd_set fds;
 			struct timeval tv;
+
+			// timeout gia thn select
 			tv.tv_usec = 50000;  
 			tv.tv_sec = 0;
 			int select_success_flag = 0;
@@ -705,7 +655,6 @@ int main(int argc, char** argv)
 			{
 				if (FD_ISSET(fd1[i], &fds))
 				{
-					// printf("Monitor %d is set\n",i);
 					// Lhpsh first_name
 					if(read(fd1[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
 					first_name=(char*)malloc(readBytes*sizeof(char));
@@ -730,8 +679,7 @@ int main(int argc, char** argv)
 					// Shmaia epityxias select ginetai 1
 					select_success_flag = 1;
 
-					// printf("fn: %s, ln: %s, c: %s, age: %d\n",first_name, last_name, country_from, age_of_citizen);
-					// printf("num_of_viruses %d\n", num_of_viruses);
+
 					printf("%s %s %s %s\n",citizen_id, first_name, last_name, country_from);
 					printf("AGE %d\n",age_of_citizen);
 
@@ -771,41 +719,39 @@ int main(int argc, char** argv)
 						free(virus_name);
 					}
 
-
 					break;
 				}
 				
-				// printf("fd1[%d] = %d\n",i, fd1[i]);
 			}
 			for (int i = 0; i < num_Monitors; i++)
 			{
 				close(fd1[i]);
 			}
 
+			// Eleftherwsh ths mnhmhs an exei desmef8ei
 			if(select_success_flag)
 			{
 				free(first_name);
 				free(last_name);
 				free(country_from);
 			}
-			// for(i=0; i < num_Monitors; i++)
-			// {
-			// 	usleep(5000);
-				// close(fd2[i]);
-			// }
+
 
 		}
+		// exit //
 		else if(strcmp(command_name,"exit")==0)
 		{
+			// apostolh SIGKILL sta Monitors
 			for (int i = 0; i < num_Monitors; i++)
 			{
 				kill(pid[i],SIGKILL);
 			}
+			// Ypswsh shmaias
 			flag=1;
 		}
 
         	
-		// softExit //
+		// softExit // Boh8htiko command gia omalo exit
 		else if(strcmp(command_name,"softExit")==0)
 		{
 			writeBytes = strlen(command_name) +1;
@@ -818,20 +764,16 @@ int main(int argc, char** argv)
 				close(fd2[i]);
 				
 			}
-			// for(i=0; i < num_Monitors; i++)
-			// {
-			// 	// printf("fd2[%d] = %d",i , fd2[i]);
-			// 	close(fd2[i]);
-			// }
+
 			break;
 		}
-		// printMonitors
+		// printMonitors // Boh8htiko command
 		else if(strcmp(command_name,"printMonitors")==0)
 		{
 			MONITOR_print_all(monitor,num_Monitors);
 		}
 
-		// continue //
+		// continue // Boh8htiko command
 		else if(strcmp(command_name,"continue")==0)
 		{
 			writeBytes = strlen(command_name) +1;
@@ -860,6 +802,8 @@ int main(int argc, char** argv)
 		}
 		int accepts=0;
 		int rejects=0;
+
+		// Metra ta accepts/rejects
 		for (int i = 0; i < requestNum; i++)
 		{
 			if (requests[i].outcome ==1 )
@@ -871,17 +815,22 @@ int main(int argc, char** argv)
 				rejects ++;
 			}
 		
-			// printf("%d. %s %s %d - %s\n",i,requests[i].countryTo,requests[i].virus_name,requests[i].outcome,requests[i].date);
 		}
+
+		// Dhmioyrgia log_file.xxx arxeioy
 		char log_file[20];
 		sprintf(log_file,"log_file.%d",getpid());
 		FILE* fp = fopen(log_file,"w+");
+
+		// Eisagwgh ka8e xwras sto log_file
 		for (int i = 0; i < counter; i++)
 		{
 			fputs(countries[i],fp);
 			fputs("\n",fp);
 
 		}
+
+		// Eisagwgh statistikwn sto log_file
 		fputs("\nTOTAL TRAVEL REQUESTS ",fp);
 		fprintf(fp,"%d\n",requestNum);	
 		fputs("ACCEPTED ",fp);
@@ -893,7 +842,6 @@ int main(int argc, char** argv)
 	}
 	else
 	{
-		printf("TM\n");
 		for (int i = 0; i < num_Monitors; i++)
 		{
 			wait(NULL);
@@ -902,7 +850,7 @@ int main(int argc, char** argv)
 
 	
 
-	// Elef8erwsh mnhmhs
+	// Elef8erwsh mnhmhs kai desmeymenwn domwn
 	for(int i=0; i < counter; i++)
 	{
 		free(countries[i]);
@@ -918,8 +866,7 @@ int main(int argc, char** argv)
 		MONITOR_destroy(&monitor[i]);
 	}
 	free(requests);
-	// free(accepted);
-	// free(rejected);
+
 	free(bloom);
 	free(monitor);
 	free(fifo1);
@@ -930,4 +877,9 @@ int main(int argc, char** argv)
 	free(fd2);
 
     return 0;
+}
+
+void int_quit_parent()
+{
+	flag=1;
 }

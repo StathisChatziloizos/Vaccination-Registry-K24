@@ -20,6 +20,8 @@ typedef struct Request
 
 int is_between_date(char* date_tested, char* date1, char* date2);
 
+int comparator(const void *str1, const void *str2);
+
 void MONITOR_init(Monitor* monitor,int numCountries);
 
 void MONITOR_print_all(Monitor* monitor, unsigned int numMonitors);

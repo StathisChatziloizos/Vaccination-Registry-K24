@@ -28,7 +28,11 @@ int is_between_date(char* date_tested, char* date1, char* date2)
     return 0;
 }
 
-
+int comparator(const void *str1, const void *str2)
+{
+	int result = strcmp(*(const char **) str1, *(const char **) str2);
+    return result;
+}
 
 void MONITOR_init(Monitor* monitor,int num_Countries)
 {
