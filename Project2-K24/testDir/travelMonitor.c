@@ -23,9 +23,12 @@
 
 const int pipeSize = 512;
 
+static int flag = 0;
 
-
-
+void int_quit_parent()
+{
+	flag=1;
+}
 
 int comparator(const void *str1, const void *str2)
 {
@@ -35,6 +38,8 @@ int comparator(const void *str1, const void *str2)
 
 int main(int argc, char** argv)
 {
+	signal(SIGINT,int_quit_parent);
+	signal(SIGQUIT,int_quit_parent);
 
     // Pedia eggrafwn
 	char* citizen_id;
@@ -245,14 +250,6 @@ int main(int argc, char** argv)
 			position++;
 		}
 
-		// printf("\tCOUNTER %d Monitor[%d] ---> num_Countries = %d\n",counter, i, num_Countries);
-		
-		// char* subdirectory;
-
-
-
-
-		// char str[100];
 
 		// Apostolh buffer size, subdirectory, bloom_size
 		if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
@@ -319,9 +316,14 @@ int main(int argc, char** argv)
 	// }
 	int requestNum=0;
 	Request* requests = (Request*)malloc(sizeof(Request));
+	for (int i = 0; i < num_Monitors; i++)
+	{
+		printf("Pid[%d] = %d\n",i, pid[i]);
+	}
+	
 	// printf("counter is %d\n",counter);
  
-    while(1)
+    while(!flag)
 	{
 		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0;
 		printf("/");		
@@ -393,6 +395,11 @@ int main(int argc, char** argv)
 					{
 						
 						printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n");
+						int rejection=-2;
+						if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+						if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
+						close(fd2[countryToIndex]);
+
 						requests[requestNum-1].outcome=0;
 
 						// rejected[countryToIndex] ++;											
@@ -442,6 +449,10 @@ int main(int argc, char** argv)
 					{
 						close(fd1[countryFromIndex]);
 						printf("REQUEST REJECTED – YOU ARE NOT VACCINATED\n");
+						int rejection=-2;
+						if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+						if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
+						close(fd2[countryToIndex]);
 						requests[requestNum-1].outcome=0;
 						// rejected[countryToIndex] ++;
 					}
@@ -480,6 +491,11 @@ int main(int argc, char** argv)
 						{
 							// Den emvoliasthke ton teleytaio xrono
 							printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n");
+							int rejection=-2;
+							if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+							if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
+							close(fd2[countryToIndex]);
+
 							requests[requestNum-1].outcome=0;
 							// rejected[countryToIndex] ++;
 
@@ -490,6 +506,11 @@ int main(int argc, char** argv)
 							{
 								// Den emvoliasthke edw kai 6 mhnes
 								printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n");
+								int rejection=-2;
+								if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+								if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
+								close(fd2[countryToIndex]);
+
 								requests[requestNum-1].outcome=0;
 								// rejected[countryToIndex] ++;
 
@@ -498,6 +519,11 @@ int main(int argc, char** argv)
 							{
 								// Emvoliasthke toys teleytaioys 6 mhnes
 								printf("REQUEST ACCEPTED – HAPPY TRAVELS\n");
+								int acceptance=-1;
+								if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+								if((nwrite = write(fd2[countryToIndex],&acceptance, sizeof(int))) == -2)    {perror("write");   return -1;}
+								close(fd2[countryToIndex]);
+
 								requests[requestNum-1].outcome=1;
 								// accepted[countryToIndex] ++;
 
@@ -506,6 +532,10 @@ int main(int argc, char** argv)
 						else
 						{
 							printf("Person vaccinated on a date after the intended trip!!! Program calculates 6 months in the past from the date given\n");
+							int rejection=-2;
+							if((fd2[countryToIndex] = open(fifo2[countryToIndex], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
+							if((nwrite = write(fd2[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
+							close(fd2[countryToIndex]);
 							requests[requestNum-1].outcome=0;
 						}
 						
@@ -579,6 +609,8 @@ int main(int argc, char** argv)
 			else
 			{
 				// Gia oles tis xwres
+
+
 				for (int i = 0; i < requestNum; i++)
 				{
 					// An h xwra einai h swsth
@@ -763,9 +795,18 @@ int main(int argc, char** argv)
 			// }
 
 		}
-        	
-		// exit //
 		else if(strcmp(command_name,"exit")==0)
+		{
+			for (int i = 0; i < num_Monitors; i++)
+			{
+				kill(pid[i],SIGKILL);
+			}
+			flag=1;
+		}
+
+        	
+		// softExit //
+		else if(strcmp(command_name,"softExit")==0)
 		{
 			writeBytes = strlen(command_name) +1;
 			for(i=0; i < num_Monitors; i++)
@@ -807,19 +848,59 @@ int main(int argc, char** argv)
 		}
     }
 
-	// To travel Monitor perimenei ta paidia toy na oloklhrwsoyn
-	for (int i = 0; i < num_Monitors; i++)
-	{
-		wait(NULL);
-	}
 
 
-	for (int i = 0; i < requestNum; i++)
+	if(flag)
 	{
-		printf("%d. %s %s %d - %s\n",i,requests[i].countryTo,requests[i].virus_name,requests[i].outcome,requests[i].date);
+		// To travel Monitor perimenei ta paidia toy na oloklhrwsoyn
+		for (int i = 0; i < num_Monitors; i++)
+		{
+			kill(pid[i],SIGKILL);
+			wait(NULL);
+		}
+		int accepts=0;
+		int rejects=0;
+		for (int i = 0; i < requestNum; i++)
+		{
+			if (requests[i].outcome ==1 )
+			{
+				accepts ++;
+			}
+			else
+			{
+				rejects ++;
+			}
+		
+			// printf("%d. %s %s %d - %s\n",i,requests[i].countryTo,requests[i].virus_name,requests[i].outcome,requests[i].date);
+		}
+		char log_file[20];
+		sprintf(log_file,"log_file.%d",getpid());
+		FILE* fp = fopen(log_file,"w+");
+		for (int i = 0; i < counter; i++)
+		{
+			fputs(countries[i],fp);
+			fputs("\n",fp);
+
+		}
+		fputs("\nTOTAL TRAVEL REQUESTS ",fp);
+		fprintf(fp,"%d\n",requestNum);	
+		fputs("ACCEPTED ",fp);
+		fprintf(fp,"%d\n",accepts);	
+		fputs("REJECTS ",fp);
+		fprintf(fp,"%d\n",rejects);	
+		fclose(fp);
+		printf("logfile: %s \n",log_file);
 	}
+	else
+	{
+		printf("TM\n");
+		for (int i = 0; i < num_Monitors; i++)
+		{
+			wait(NULL);
+		}
+	}
+
 	
-
 
 	// Elef8erwsh mnhmhs
 	for(int i=0; i < counter; i++)

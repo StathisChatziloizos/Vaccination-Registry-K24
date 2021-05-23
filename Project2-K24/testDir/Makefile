@@ -17,3 +17,6 @@ clean:
 
 pipes:
 	rm -rf fifo*
+
+log:
+	rm -rf log_file*

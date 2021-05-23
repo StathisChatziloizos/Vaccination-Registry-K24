@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <signal.h>
 
 
 #include "hash.h"
@@ -23,11 +24,63 @@
 // char* fifo1 = "simpleFifo";
 // char* fifo2 = "simpleFifo2";
 
+static int flag = 0;
+char** subdirectory;
+int accepts = 0;
+int rejects = 0;
+int numCountries;
+
+
+void int_quit_children()
+{
+	flag=1;
+	// printf(" -- INT/QUIT RECEIVED MONITOR!\n");
+	char log_file[20];
+	sprintf(log_file,"log_file.%d",getpid());
+	FILE* fp = fopen(log_file,"w+");
+
+
+	for (int i = 0; i < numCountries; i++)
+	{
+		int position=0;
+		while (position < strlen(subdirectory[i]))
+		{
+			if (subdirectory[i][position] == '/')
+			{
+				break;
+			}
+			position++;
+		}
+	
+		char* country=subdirectory[i]+position+1;
+		fputs(country,fp);
+		fputs("\n",fp);
+
+		// printf("%s\n",country);
+	}
+	// for (int i = 0; i < counter; i++)
+	// {
+	// 	fputs(countries[i],fp);
+	// 	fputs("\n",fp);
+
+	// }
+	fputs("\nTOTAL TRAVEL REQUESTS ",fp);
+	fprintf(fp,"%d\n",accepts+rejects);	
+	fputs("ACCEPTED ",fp);
+	fprintf(fp,"%d\n",accepts);	
+	fputs("REJECTS ",fp);
+	fprintf(fp,"%d\n",rejects);	
+	fclose(fp);
+	printf("logfile: %s \n",log_file);
+}
+
 const int pipeSize = 512;
 
 int main(int argc, char** argv)
 {
-    int fd1, fd2, nwrite, readBytes, writeBytes, numCountries;
+	signal(SIGINT,int_quit_children);
+	signal(SIGQUIT,int_quit_children);
+    int fd1, fd2, nwrite, readBytes, writeBytes;
 	unsigned int buffer_size;
 
 	char* directoryName;
@@ -41,7 +94,6 @@ int main(int argc, char** argv)
 	char* fifo1 = argv[1];
 	char* fifo2 = argv[2];
 	// printf("Monitor: fifo1 = %s, fifo2 = %s\n", fifo1, fifo2);
-	char** subdirectory;
 	char command[20];
 
 	if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2");    return -1;}
@@ -294,13 +346,34 @@ int main(int argc, char** argv)
 	{
 		if((fd2 = open(fifo2, O_RDONLY)) < 0 )     {perror("Open fifo2-Monitor");    return -1;}
 		if(read(fd2, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+		if (readBytes == -1)
+		{
+			accepts ++;
+			close(fd2);
+			usleep(1);
+			continue;
+		}
+		else if(readBytes == -2)
+		{
+			rejects ++;
+			usleep(1);
+			close(fd2);
+			// printf("RejectsM - pid %d\n",getpid());
+			continue;
+		}
 		if(read(fd2, command, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh subdirectory
+	
+
+
+		
+
+
 		// printf("here\n");
 		// close(fd2);
 		// fflush(stdout);
 
 
-		if (strcmp(command,"exit")==0)
+		if (strcmp(command,"softExit")==0)
 		{
 			// printf("Exit - PID = %d - FIFO %s - ID %d\n",getpid(),fifo2, fd2);
 			break;
@@ -467,12 +540,15 @@ int main(int argc, char** argv)
 			}
 		}
 	}
-	
 
+
+
+
+	
 	// if((nwrite = write(fd1,bloom.filter, bloom.size)) == -1)    {perror("write");   return -1;}
 
-	
 
+	
 
 		// if((nwrite = write(fd1,&msgbuf, strlen(msgbuf) +1)) == -1)    {perror("write");   return -1;}
         // if((nwrite = write(fd1,&bloom, sizeof(bloom))) == -1)    {perror("write");   return -1;}
@@ -483,6 +559,7 @@ int main(int argc, char** argv)
     close(fd1);
     close(fd2);
 	BLOOM_destroy(&bloom);
+	// printf("Here\n");
 	HASH_clear(&record_hash_table);
 	BST_destroy(virus_tree);
 	free(array_of_viruses);
@@ -501,6 +578,6 @@ int main(int argc, char** argv)
 	free(counter);
 	free(files);
 	
-	printf("Exiting child!\n");
+	printf("Exited Monitor R:%d - A:%d!\n",rejects,accepts);
     return 0;
 }
