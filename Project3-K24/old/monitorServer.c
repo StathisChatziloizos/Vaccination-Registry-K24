@@ -72,7 +72,7 @@ int main(int argc, char** argv)
 {
 	// Diaxeirismos SIGINT kai SIGQUIT
 	signal(SIGINT,int_quit_children);
-	signal(SIGQUIT,int_quit_children);
+	// signal(SIGQUIT,int_quit_children);
 
     int nwrite, readBytes, writeBytes;
 	unsigned int buffer_size;
@@ -102,7 +102,7 @@ int main(int argc, char** argv)
 
 	// Initiate connection
     if ( connect ( sock , serverptr , sizeof ( server ) ) < 0)   {perror("connect client"); return -1;}
-    printf ( "Connecting to port % d \n ", port ) ;
+    // printf ( "Connecting to port % d \n ", port ) ;
 
 	// Boh8htikh metablhth, krataei thn trexoysa entolh apo to travelMonitor
 	char command[20];

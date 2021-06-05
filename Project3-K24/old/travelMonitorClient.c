@@ -30,7 +30,7 @@ void int_quit_parent();
 int main(int argc, char** argv)
 {
 	signal(SIGINT,int_quit_parent);
-	signal(SIGQUIT,int_quit_parent);
+	// signal(SIGQUIT,int_quit_parent);
 
     // Pedia eggrafwn
 	char* citizen_id;
@@ -57,11 +57,17 @@ int main(int argc, char** argv)
 	// Eswterikh grammh entolwn
 	char inner_menu_line[INNER_MENU_LINE_LENGTH];	
 
-	// To megethos toy buffer
-	unsigned int buffer_size;
+	// To megethos toy buffer twn sockets
+	unsigned int socket_buff_size;
 
 	// O ari8mos Monitor diergasiwn
-	unsigned int num_Monitors; 
+	unsigned int num_Monitors;
+
+	// To mege8os toy kyklikoy buffer
+	unsigned int cyclic_buff_size;
+
+	// O ari8mos threads twn Monitors
+	unsigned int num_Threads; 
 
 	// Deikths se Bloom struct
     Bloom* bloom;
@@ -91,30 +97,36 @@ int main(int argc, char** argv)
 	Monitor* monitor;
 
 	// Elegxoi orismatwn ekteleshs programmatos
-	if(argc!=9)
+	if(argc!=13)
 	{
-		printf("Usage: travelMonitor -m numMonitors –b bufferSize -s sizeOfBloom -i input_dir\n");
+		printf("Usage: ./travelMonitorClient –m numMonitors -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom -i input_dir -t numThread\n");
 		return 0;	
 	}
 	
-	if(strcmp(argv[1],"-m")!=0&&strcmp(argv[3],"-b")!=0
-		&&strcmp(argv[5],"-s")!=0&&strcmp(argv[7],"-i")!=0)
+	if(strcmp(argv[1],"-m")!=0 || strcmp(argv[3],"-b")!=0 || strcmp(argv[5],"-c")!=0
+		 || strcmp(argv[7],"-s")!=0 || strcmp(argv[9],"-i")!=0 || strcmp(argv[11],"-t")!=0)
 	{
-		printf("Usage: travelMonitor -m numMonitors –b bufferSize -s sizeOfBloom -i input_dir\n");
+		printf("Usage: ./travelMonitorClient –m numMonitors -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom -i input_dir -t numThread\n");
 		return 0;		
 	}
 	
 	// Ka8orismos ari8moy Monitor diergasiwn
 	num_Monitors=(unsigned int)(atoi(argv[2]));
 
-	// ka8orismos mege8ous toy buffer
-	buffer_size=(unsigned int)(atoi(argv[4]));
+	// ka8orismos mege8ous toy buffer twn sockets
+	socket_buff_size=(unsigned int)(atoi(argv[4]));
 
-	// ka8orismos mege8ous bloom filtroy
-	bloom_size=(unsigned long)(atol(argv[6]));
+	// ka8orismos mege8ous toy buffer
+	cyclic_buff_size=(unsigned int)(atoi(argv[6]));
+
+	// ka8orismos mege8ous toy kyklikoy buffer twn monitorServer
+	bloom_size=(unsigned long)(atol(argv[8]));
 
 	// Ka8orismos toy input_dir
-	directoryName = argv[8];
+	directoryName = argv[10];
+
+	// ka8orismos ari8moy thread twn Monitors
+	num_Threads=(unsigned int)(atoi(argv[12]));
 
 	// Gemisma toy pinaka xwrwn me tis xwres toy directory
     if((dir_ptr = opendir(directoryName)) == NULL) 		{perror("Open Dir"); 	return -1;}
@@ -198,8 +210,8 @@ int main(int argc, char** argv)
         if (pid[i] < 0)     {perror("Fork ");    return -1;}
         if (pid[i] == 0)
         {
-            char* args[] = {"./Monitor", port_arg , NULL};
-            execv(args[0], args);   //exec ./Monitor
+            char* args[] = {"./monitorServer", port_arg , NULL};
+            execv(args[0], args);   //exec ./monitorServer
         }
     }
 
@@ -232,12 +244,12 @@ int main(int argc, char** argv)
 		clientlen[i] = sizeof(client);
 
         if (( newsock[i] = accept ( sock[i] , clientptr[i] , & clientlen[i] ) ) < 0)    {perror("accept server");  return -1;}
-        printf("Accepted connection\n");
+        // printf("Accepted connection\n");
         close(sock[i]);
 
 		// Apostolh buffer size kai ari8moy xwrwn
 		// if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-		if((nwrite = write(newsock[i],&buffer_size, sizeof(int))) == -1)    {perror("write");   return -1;}
+		if((nwrite = write(newsock[i],&socket_buff_size, sizeof(int))) == -1)    {perror("write");   return -1;}
 		if((nwrite = write(newsock[i],&monitor[i].numCountries, sizeof(int))) == -1)    {perror("write");   return -1;}
 		for(int j=0; j < monitor[i].numCountries; j++)
 		{
@@ -265,16 +277,16 @@ int main(int argc, char** argv)
 		offset = 0;
 
 		// Lhpsh toy bloom filter apo to Monitor
-		// H lhpsh ginetai se tmhmata ta opoia ka8orizei to buffer_size
+		// H lhpsh ginetai se tmhmata ta opoia ka8orizei to socket_buff_size
 		// H metablhth offset krataei ka8e fora ton ari8mo twn bytes poy exoun hdh paralhf8ei
 		while(offset < bloom[i].size)
 		{
-			if(offset + buffer_size > bloom[i].size)
+			if(offset + socket_buff_size > bloom[i].size)
 			{
 				if((nread = read(newsock[i], bloom[i].filter + offset, bloom[i].size - offset)) <= 0)     {perror("read");    return -1;}
 				break;
 			}
-			if((nread = read(newsock[i], bloom[i].filter + offset, buffer_size)) <= 0)     {perror("read");    return -1;}
+			if((nread = read(newsock[i], bloom[i].filter + offset, socket_buff_size)) <= 0)     {perror("read");    return -1;}
 			offset += nread;
 		}
 
@@ -473,7 +485,7 @@ int main(int argc, char** argv)
 						}
 						else if(vacc_year == 0)
 						{
-							if (vacc_month > 6 ||(vacc_month == 6 && vacc_day > 0))
+							if (vacc_month > 6 || (vacc_month == 6 && vacc_day > 0))
 							{
 								// Den emvoliasthke edw kai 6 mhnes
 								printf("REQUEST REJECTED – YOU WILL NEED ANOTHER VACCINATION BEFORE TRAVEL DATE\n");
