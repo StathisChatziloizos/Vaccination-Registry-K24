@@ -70,12 +70,41 @@ const int pipeSize = 512;
 
 int main(int argc, char** argv)
 {
+	if(argc <= 10)
+	{
+		printf("Usage: ./monitorServer -p port -t numThreads -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom path1 path2 ... pathn");
+		return -1;
+	}
+	if(strcmp(argv[1],"-p")!=0 || strcmp(argv[3],"-t")!=0 || strcmp(argv[5],"-b")!=0
+		 || strcmp(argv[7],"-c")!=0 || strcmp(argv[9],"-s")!=0)
+	{
+		printf("Usage: ./monitorServer -p port -t numThreads -b socketBufferSize -c cyclicBufferSize -s sizeOfBloom path1 path2 ... pathn");
+		return 0;		
+	}
+
+	int port = atoi(argv[2]);
+	unsigned int num_threads = (unsigned int)atoi(argv[4]);
+
+	// ka8orismos mege8ous toy buffer twn sockets
+	unsigned int socket_buff_size = (unsigned int)atoi(argv[6]);
+
+	// ka8orismos mege8ous toy buffer
+	unsigned int cyclic_buff_size = (unsigned int)(atoi(argv[8]));
+
+	// Ka8orismos mege8ous bloom filtroy
+	unsigned long bloom_size = (unsigned int)(atoi(argv[10]));
+
+
+	// for (int i = 1; i < argc; i++)	// apo to 11 ksekinane ta paths
+    // {
+    //     printf("argv[%d] %s\n",i,argv[i]);
+    // }
+
 	// Diaxeirismos SIGINT kai SIGQUIT
 	signal(SIGINT,int_quit_children);
 	// signal(SIGQUIT,int_quit_children);
 
     int nwrite, readBytes, writeBytes;
-	unsigned int buffer_size;
 
 	// Boh8htikes metablhtes gia prospelash katalogwn
 	char* directoryName;
@@ -83,11 +112,7 @@ int main(int argc, char** argv)
     struct dirent* dir;
 
 
-	// To megethos bloom filtroy
-	unsigned long bloom_size;
-
 	// Sockets --------------------------------------------------------------------------
-	int port = atoi(argv[1]);
 	int sock;
 
 	struct sockaddr_in server;
@@ -107,21 +132,13 @@ int main(int argc, char** argv)
 	// Boh8htikh metablhth, krataei thn trexoysa entolh apo to travelMonitor
 	char command[20];
 
-	// Lhpsh buffer_size kai ari8moy xwrwn 
-	if(read(sock, &buffer_size, sizeof(int)) < 0)     {perror("read");    return -1;}
-	if(read(sock, &numCountries, sizeof(int)) < 0)     {perror("read");    return -1;}
+	numCountries = argc - 11;
+
+		// printf("argc %d numCountries %d\n", argc-11, numCountries);
+
 
 	// Desmeysh mnhmhs gia ta subdirectories/xwres
 	subdirectory = (char**)malloc(numCountries * sizeof(char*));
-
-	// Gia ola ta subdirectories
-	for (int i = 0; i < numCountries; i++)
-	{
-		// Desmeysh mnhmhs kai lhpsh subdirectory
-		if(read(sock, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
-		subdirectory[i] = (char*)malloc(readBytes);
-		if(read(sock, subdirectory[i], readBytes) < 0)     {perror("read");    return -1;}
-	}
 
 	// Lhpsh bloom_size
 	if(read(sock, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}
@@ -138,7 +155,7 @@ int main(int argc, char** argv)
 	{
 		counter[i]=0;
 		files[i] = (char**)malloc(40 * sizeof(char*));
-		if((dir_ptr = opendir(subdirectory[i])) == NULL) 		{perror("Open Dir"); 	return -1;}
+		if((dir_ptr = opendir(argv[i+11])) == NULL) 		{perror("Open Dir"); 	return -1;}
 		while((dir = readdir(dir_ptr)) != NULL )
 		{
 			// Agnohse to current kai to parent directory
@@ -240,7 +257,7 @@ int main(int argc, char** argv)
 			// An den yparxei to arxeio synexise
 			if(files[j][z] == NULL)
 				continue;
-			strcpy(file,subdirectory[j]);
+			strcpy(file,argv[j+11]);
 			strcat(file, "/");
 			strcat(file,files[j][z]);
 
@@ -324,11 +341,11 @@ int main(int argc, char** argv)
 
 
 	// Apostolh toy bloom filter toy Monitor sto travelMonitor
-	// H apostolh ginetai se tmhmata ta opoia ka8orizei to buffer_size
+	// H apostolh ginetai se tmhmata ta opoia ka8orizei to socket_buff_size
 	// H metablhth offset krataei ka8e fora ton ari8mo twn bytes poy exoun hdh stal8ei
 	while(offset < bloom_size)
 	{
-		if((nwrite = write(sock,bloom.filter + offset, buffer_size)) == -1)	{perror("write");   return -1;}
+		if((nwrite = write(sock,bloom.filter + offset, socket_buff_size)) == -1)	{perror("write");   return -1;}
 		offset += nwrite;
 	}
 
@@ -377,7 +394,7 @@ int main(int argc, char** argv)
 		else if(strcmp(command,"searchVaccinationStatus")==0)
 		{
 			// Lhpsh citizen_id
-			if(read(sock, &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+			if(read(sock, &readBytes, sizeof(int)) < 0)     {perror("read-mon(1)");    return -1;}
 			if(read(sock, citizen_id, readBytes) < 0)     {perror("read");    return -1;}
 
 			record* requested_citizen;

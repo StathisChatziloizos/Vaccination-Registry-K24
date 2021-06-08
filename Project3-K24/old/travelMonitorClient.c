@@ -19,7 +19,7 @@
 
 #define INNER_MENU_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
-#define PORT 8080
+#define PORT 6900
 
 
 static int flag = 0;
@@ -67,7 +67,7 @@ int main(int argc, char** argv)
 	unsigned int cyclic_buff_size;
 
 	// O ari8mos threads twn Monitors
-	unsigned int num_Threads; 
+	unsigned int num_threads; 
 
 	// Deikths se Bloom struct
     Bloom* bloom;
@@ -126,7 +126,7 @@ int main(int argc, char** argv)
 	directoryName = argv[10];
 
 	// ka8orismos ari8moy thread twn Monitors
-	num_Threads=(unsigned int)(atoi(argv[12]));
+	num_threads=(unsigned int)(atoi(argv[12]));
 
 	// Gemisma toy pinaka xwrwn me tis xwres toy directory
     if((dir_ptr = opendir(directoryName)) == NULL) 		{perror("Open Dir"); 	return -1;}
@@ -177,6 +177,10 @@ int main(int argc, char** argv)
     struct sockaddr *serverptr[num_Monitors];
     struct sockaddr *clientptr[num_Monitors];
 	
+	// Desmeysh mnhmhs subdirectory
+	subdirectory = (char*)malloc(50 * sizeof(char));
+
+	char** args;
 
 	// Fork - Dhmioyrgia Monitors
     pid_t pid[num_Monitors];
@@ -201,37 +205,17 @@ int main(int argc, char** argv)
 
         // Listen for connections
         if ( listen ( sock[i] , 50) < 0)    {perror("listen server");  return -1;};
-        
-		char port_arg[5];
-        sprintf(port_arg,"%d",port[i]);
 
-        pid[i] = fork();
-
-        if (pid[i] < 0)     {perror("Fork ");    return -1;}
-        if (pid[i] == 0)
-        {
-            char* args[] = {"./monitorServer", port_arg , NULL};
-            execv(args[0], args);   //exec ./monitorServer
-        }
-    }
-
-	// Metrhths
-	int i;
-
-	// Desmeysh mnhmhs subdirectory
-	subdirectory = (char*)malloc(50 * sizeof(char));
-	
-
-    for(i=0; i < num_Monitors; i++)
-    {
-		// Reset metablhtwn
-		offset = 0;
-		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0, num_Countries = 0;
+		int num_Countries = 0;
 
 		for (int j = i; j <= counter-1; j+=num_Monitors)
 		{	
 			num_Countries++;
 		}
+
+		char port_arg[5];
+        sprintf(port_arg,"%d",port[i]);
+
 		// Arxikopoihsh monitor
 		MONITOR_init(&monitor[i], num_Countries);
 		unsigned int position = 0;
@@ -241,31 +225,75 @@ int main(int argc, char** argv)
 			position++;
 		}
 
+		strcpy(subdirectory,directoryName);
+
+		// Pros8hkh '/' sto telos toy directory poy do8hke efoson leipei
+		if(subdirectory[strlen(subdirectory)-1] !='/')
+			strcat(subdirectory, "/");
+
+		args = (char**)malloc((monitor[i].numCountries + 12) * sizeof(char*));
+
+		for	(int j = 0; j < monitor[i].numCountries+11; j++)
+		{
+			args[j] = (char*)malloc(50 * sizeof(char));
+		}
+
+		strcpy(args[0], "./monitorServer");
+		strcpy(args[1], "-p");
+		strcpy(args[2], port_arg);
+		strcpy(args[3], "-t");
+		strcpy(args[4], argv[12]);
+		strcpy(args[5], "-b");
+		strcpy(args[6], argv[4]);
+		strcpy(args[7], "-c");
+		strcpy(args[8], argv[6]);
+		strcpy(args[9], "-s");
+		strcpy(args[10], argv[8]);
+
+		for (int j = 11; j < monitor[i].numCountries+11; j++)
+        {
+            strcpy(args[j], subdirectory);
+			strcat(args[j], monitor[i].countries[j-11]);
+			// printf("args[%d] = %s\n", j , args[j]);
+        }
+        args[monitor[i].numCountries+11] = NULL;
+		// printf("monitor[%d].numCountries+2 = %d\n", i, monitor[i].numCountries+2);
+
+		// printf("subdirectory: %s\n",subdirectory);
+        
+
+        pid[i] = fork();
+
+        if (pid[i] < 0)     {perror("Fork ");    return -1;}
+        if (pid[i] == 0)
+        {
+            char* args2[] = {"./monitorServer", port_arg, NULL};
+            execv(args[0], args);   //exec ./monitorServer
+        }
+
+		for	(int j = 0; j < monitor[i].numCountries+12; j++)
+		{
+			free(args[j]);
+		}
+		free(args);
+    }
+
+	// Metrhths
+	int i;
+
+
+	
+
+    for(i=0; i < num_Monitors; i++)
+    {
+		// Reset metablhtwn
+		offset = 0;
+		int nwrite = 0 , nread = 0, readBytes = 0, writeBytes = 0;
+
 		clientlen[i] = sizeof(client);
 
         if (( newsock[i] = accept ( sock[i] , clientptr[i] , & clientlen[i] ) ) < 0)    {perror("accept server");  return -1;}
-        // printf("Accepted connection\n");
-        close(sock[i]);
 
-		// Apostolh buffer size kai ari8moy xwrwn
-		// if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-		if((nwrite = write(newsock[i],&socket_buff_size, sizeof(int))) == -1)    {perror("write");   return -1;}
-		if((nwrite = write(newsock[i],&monitor[i].numCountries, sizeof(int))) == -1)    {perror("write");   return -1;}
-		for(int j=0; j < monitor[i].numCountries; j++)
-		{
-			strcpy(subdirectory,directoryName);
-
-			// Pros8hkh '/' sto telos toy directory poy do8hke efoson leipei
-			if(subdirectory[strlen(subdirectory)-1] !='/')
-				strcat(subdirectory, "/");
-
-			strcat(subdirectory,monitor[i].countries[j]);
-			writeBytes = strlen(subdirectory) + 1;
-
-			// Apostolh subdirectory
-			if((nwrite = write(newsock[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-			if((nwrite = write(newsock[i],subdirectory, writeBytes)) == -1)    {perror("write");   return -1;}
-		}
 
 		// Apostolh bloom_size
 		if((nwrite = write(newsock[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}
@@ -653,8 +681,8 @@ int main(int argc, char** argv)
 			{
 				// Apostolh searchVaccinationStatus command sta Monitors
 				// if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
-				if((nwrite = write(newsock[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
-				if((nwrite = write(newsock[i],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(newsock[i],&writeBytes, sizeof(int))) == -1)    {perror("write(1)");   return -1;}
+				if((nwrite = write(newsock[i],command_name, writeBytes)) == -1)    {perror("write(2)");   return -1;}
 				
 				// Apostolh citizen_id sta Monitors
 				if((nwrite = write(newsock[i],&citizen_id_length, sizeof(int))) == -1)    {perror("write");   return -1;}
@@ -669,7 +697,7 @@ int main(int argc, char** argv)
 			struct timeval tv;
 
 			// timeout gia thn select
-			tv.tv_usec = 50000;  
+			tv.tv_usec = 100000;  
 			tv.tv_sec = 0;
 			int select_success_flag = 0;
 			int num_of_viruses = 0;
@@ -687,12 +715,12 @@ int main(int argc, char** argv)
 				if (FD_ISSET(newsock[i], &fds))
 				{
 					// Lhpsh first_name
-					if(read(newsock[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+					if(read(newsock[i], &readBytes, sizeof(int)) < 0)     {perror("read is_set(1)");    return -1;}
 					first_name=(char*)malloc(readBytes*sizeof(char));
-					if(read(newsock[i], first_name, readBytes) < 0)     {perror("read");    return -1;}	
+					if(read(newsock[i], first_name, readBytes) < 0)     {perror("read is_set(2)");    return -1;}	
 					
 					//Lhpsh last_name 
-					if(read(newsock[i], &readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+					if(read(newsock[i], &readBytes, sizeof(int)) < 0)     {perror("read is_set(3)");    return -1;}
 					last_name=(char*)malloc(readBytes*sizeof(char));
 					if(read(newsock[i], last_name, readBytes) < 0)     {perror("read");    return -1;}	
 
@@ -893,6 +921,9 @@ int main(int argc, char** argv)
 		// unlink(fifo2[i]);
 		// free(fifo1[i]);
 		// free(fifo2[i]);
+		shutdown(sock[i], SHUT_RDWR);
+		shutdown(newsock[i], SHUT_RDWR);
+		close(sock[i]);
 		close(newsock[i]);
 		BLOOM_destroy(&bloom[i]);
 		MONITOR_destroy(&monitor[i]);
