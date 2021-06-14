@@ -19,7 +19,7 @@
 
 #define INNER_MENU_LINE_LENGTH 200
 #define BLOOM_STRING_MAX_LENGTH 50
-#define PORT 6900
+#define PORT 9400
 
 
 static int flag = 0;
@@ -238,7 +238,8 @@ int main(int argc, char** argv)
 			args[j] = (char*)malloc(50 * sizeof(char));
 		}
 
-		strcpy(args[0], "./monitorServer");
+		strcpy(args[0], "./threadsMonitorServer");
+		// strcpy(args[0], "./monitorServer");
 		strcpy(args[1], "-p");
 		strcpy(args[2], port_arg);
 		strcpy(args[3], "-t");
@@ -296,7 +297,7 @@ int main(int argc, char** argv)
 
 
 		// Apostolh bloom_size
-		if((nwrite = write(newsock[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}
+		// if((nwrite = write(newsock[i],&bloom_size, sizeof(unsigned long))) == -1)    {perror("write");   return -1;}
 		// close(fd2[i]);
 
 		// Lhpsh bloom filter
@@ -453,6 +454,17 @@ int main(int argc, char** argv)
 					// Lhpsh apanthshs
 					// if((fd1[countryFromIndex] = open(fifo1[countryFromIndex], O_RDONLY)) < 0 )     {perror("Open fifo1-TravelMonitor");    return -1;}
 					if(read(newsock[countryFromIndex],&readBytes, sizeof(int)) < 0)     {perror("read");    return -1;}
+
+					if (readBytes == -1)
+					{
+						// O ios de bre8hke
+						// Stelnete -2 sto Monitor poy diaxeirizetai to countryTo
+						int rejection=-2;
+						if((nwrite = write(newsock[countryToIndex],&rejection, sizeof(int))) == -2)    {perror("write");   return -1;}
+
+						requests[requestNum-1].outcome=0;
+						continue;
+					}
 					if(read(newsock[countryFromIndex],reply, readBytes) < 0)     {perror("read");    return -1;}		// Lhpsh apanthshs
 
 					if(strcmp(reply,"NO")==0)
@@ -686,7 +698,7 @@ int main(int argc, char** argv)
 				
 				// Apostolh citizen_id sta Monitors
 				if((nwrite = write(newsock[i],&citizen_id_length, sizeof(int))) == -1)    {perror("write");   return -1;}
-				if((nwrite = write(newsock[i],citizen_id, writeBytes)) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(newsock[i],citizen_id, citizen_id_length)) == -1)    {perror("write");   return -1;}
 				// close(fd2[i]);
 
 				

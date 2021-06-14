@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <signal.h>
 #include <netinet/in.h>
-// #include <netbd.h>
+#include <pthread.h>
 
 
 #include "hash.h"
@@ -26,8 +26,36 @@ static char** subdirectory;
 static int accepts = 0;
 static int rejects = 0;
 static int numCountries;
+static char filesBuffer[1000][80];
+static int filesBufferCounter = 0;
+static int totalFilesEdited = 0;
 
 
+typedef struct arguments{
+    int* counter;
+	int filesCounter;
+	int num_threads;
+    char* file;
+    hash_table record_hash_table;
+    Tree virus_tree;
+    int num_of_viruses;
+    Bloom bloom;
+}arguments;
+
+pthread_mutex_t mtx;
+pthread_mutex_t mtxBuffer;
+pthread_cond_t condBuffer;
+
+void* threadFunction(void* arg);
+
+void add_file_to_buffer(char* file)
+{
+	pthread_mutex_lock(&mtxBuffer);
+	strcpy(filesBuffer[filesBufferCounter],file);
+	filesBufferCounter++;
+	pthread_mutex_unlock(&mtxBuffer);
+	pthread_cond_signal(&condBuffer);
+}
 
 // Synarthsh poy diaxeirizetai ta SIGINT/SIGQUIT twn Monitors
 void int_quit_children()
@@ -38,23 +66,23 @@ void int_quit_children()
 	FILE* fp = fopen(log_file,"w+");
 
 	// Eisagwgh ka8e xwras sto log_file
-	for (int i = 0; i < numCountries; i++)
-	{
-		int position=0;
-		while (position < strlen(subdirectory[i]))
-		{
-			if (subdirectory[i][position] == '/')
-			{
-				break;
-			}
-			position++;
-		}
+	// for (int i = 0; i < numCountries; i++)
+	// {
+	// 	int position=0;
+	// 	while (position < strlen(subdirectory[i]))
+	// 	{
+	// 		if (subdirectory[i][position] == '/')
+	// 		{
+	// 			break;
+	// 		}
+	// 		position++;
+	// 	}
 
-		// Metablhth poy krata th xwra apo to subdirectory (Morfh subdirextory: input_dir/xwra)
-		char* country=subdirectory[i]+position+1;
-		fputs(country,fp);
-		fputs("\n",fp);
-	}
+	// 	// Metablhth poy krata th xwra apo to subdirectory (Morfh subdirextory: input_dir/xwra)
+	// 	char* country=subdirectory[i]+position+1;
+	// 	fputs(country,fp);
+	// 	fputs("\n",fp);
+	// }
 
 	// Eisagwgh statistikwn sto log_file
 	fputs("\nTOTAL TRAVEL REQUESTS ",fp);
@@ -82,8 +110,11 @@ int main(int argc, char** argv)
 		return 0;		
 	}
 
+	arguments* thread_args = (arguments*) malloc(sizeof(arguments));
+
 	int port = atoi(argv[2]);
 	unsigned int num_threads = (unsigned int)atoi(argv[4]);
+	thread_args->num_threads = num_threads;
 
 	// ka8orismos mege8ous toy buffer twn sockets
 	unsigned int socket_buff_size = (unsigned int)atoi(argv[6]);
@@ -111,6 +142,10 @@ int main(int argc, char** argv)
     DIR* dir_ptr;
     struct dirent* dir;
 
+	pthread_mutex_init(&mtx, NULL);
+	pthread_mutex_init(&mtxBuffer, NULL);
+    pthread_cond_init(&condBuffer, NULL);
+
 
 	// Sockets --------------------------------------------------------------------------
 	int sock;
@@ -118,16 +153,7 @@ int main(int argc, char** argv)
 	struct sockaddr_in server;
     struct sockaddr *serverptr = (struct sockaddr*)&server;
 
-	if (( sock = socket ( AF_INET , SOCK_STREAM , 0) ) < 0)     {perror("socket client"); return -1;}
 
-	server.sin_family = AF_INET;    // Internet Domain
-    // memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
-    server.sin_addr.s_addr = htonl(INADDR_ANY); //inet_addr("127.0.0.1");
-    server.sin_port = htons(port);  // Server port
-
-	// Initiate connection
-    if ( connect ( sock , serverptr , sizeof ( server ) ) < 0)   {perror("connect client"); return -1;}
-    // printf ( "Connecting to port % d \n ", port ) ;
 
 	// Boh8htikh metablhth, krataei thn trexoysa entolh apo to travelMonitor
 	char command[20];
@@ -140,7 +166,7 @@ int main(int argc, char** argv)
 	// Desmeysh mnhmhs gia ta subdirectories/xwres
 	subdirectory = (char**)malloc(numCountries * sizeof(char*));
 
-	// Lhpsh bloom_size
+	// // Lhpsh bloom_size
 	// if(read(sock, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}
 	// close(fd2);
 
@@ -148,12 +174,14 @@ int main(int argc, char** argv)
 	// O pinakas arxeiwn exei th morfh:
 	// files[ari8mos xwrwn][ari8mos arxeiwn ths xwras]
 	char*** files = (char***)malloc(numCountries * sizeof(char**));
-	int* counter = (int*)malloc(numCountries * sizeof(int));
+	char* filePaths[1000];
+	int filesCounter = 0;
+	thread_args->counter = (int*)malloc(numCountries * sizeof(int));
 
 	// Gemisma toy pinaka arxeiwn me ta arxeia toy ka8e subdirectory 
 	for (int i = 0; i < numCountries; i++)
 	{
-		counter[i]=0;
+		thread_args->counter[i]=0;
 		files[i] = (char**)malloc(40 * sizeof(char*));
 		if((dir_ptr = opendir(argv[i+11])) == NULL) 		{perror("Open Dir"); 	return -1;}
 		while((dir = readdir(dir_ptr)) != NULL )
@@ -162,23 +190,34 @@ int main(int argc, char** argv)
 			if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
 				continue;
 
-			files[i][counter[i]] = (char*)malloc(strlen(dir->d_name)+1);
-			strcpy (files[i][counter[i]],dir->d_name);
-			counter[i]++;
+			files[i][thread_args->counter[i]] = (char*)malloc(strlen(dir->d_name)+1);
+			filePaths[filesCounter] = (char*)malloc(strlen(dir->d_name) + strlen(argv[i+11]) +2);
+			strcpy (files[i][thread_args->counter[i]],dir->d_name);
+			strcpy (filePaths[filesCounter],argv[i+11]);
+			strcat (filePaths[filesCounter],"/");
+			strcat (filePaths[filesCounter],dir->d_name);
+			filesCounter++;
+			thread_args->counter[i]++;
 		}
 
 		closedir(dir_ptr);
 	}
+	thread_args->filesCounter = filesCounter;
+	for (int i = 0; i < filesCounter; i++)
+	{
+		// printf("%s\n", filePaths[i]);
+	}
+	
 
     // Pedia eggrafwn
-	char* citizen_id;
-	char* first_name;
-	char* last_name;
-	char* country_name;
-	char* age;
-	char* virus_name;
-	char* vaccination_condition;
-	char* date;
+	char citizen_id[10];
+	char first_name[20];
+	char last_name[20];
+	char country_name[25];
+	char age[4];
+	char virus_name[20];
+	char vaccination_condition[5];
+	char date[15];
 	
 	// To string poy ginetai hash sto bloom filter
 	unsigned char bloom_string[BLOOM_STRING_MAX_LENGTH];
@@ -197,10 +236,10 @@ int main(int argc, char** argv)
 	char file_line[FILE_LINE_LENGTH];		
 	
 	// Pinakas katakermatismoy twn citizen
-	hash_table record_hash_table;
+	// hash_table record_hash_table;
 	
 	// To dentro twn iwn
-	Tree virus_tree;
+	// Tree virus_tree;
 	
 	// Deikths se skip list node
 	skip_node* skip_lst_node;
@@ -215,7 +254,7 @@ int main(int argc, char** argv)
 	country_node* head=NULL;
 	
 	// To bloom filtro 
-	Bloom bloom;
+	// Bloom bloom;
 	
 	// Boh8htikh metablhth
 	unsigned int i;
@@ -227,7 +266,7 @@ int main(int argc, char** argv)
 	node** array_of_viruses;
 		
 	// Metrhths iwn
-	int num_of_viruses=0;
+	thread_args->num_of_viruses=0;
 	
 	int num_of_buckets;
 		
@@ -237,111 +276,98 @@ int main(int argc, char** argv)
 	unsigned long offset = 0;		
 		
 	// Arxikopoihsh toy pinaka katakermatismoy twn citizen
-	HASH_init(&record_hash_table,num_of_buckets);
+	HASH_init(&(thread_args->record_hash_table),num_of_buckets);
 	
 	// Arxikopoihsh toy dentroy twn iwn filtrou
-	BST_init(&virus_tree);
+	BST_init(&(thread_args->virus_tree));
 	
 	// Arxikopoihsh toy bloom filtrou
-	BLOOM_init(&bloom,bloom_size);
+	BLOOM_init(&(thread_args->bloom),bloom_size);
 
 	// Metablhth poy krataei to onoma toy trexontos arxeioy  
-	unsigned char file[50];
+	thread_args->file = (char*)malloc(50 * sizeof(char));
+
+
+	printf("num_threads %d\n", num_threads);
+	if(num_threads > filesCounter)
+	{
+		// thread_args->num_threads = thread_args->num_threads - thread_args->filesCounter; 
+		thread_args->num_threads = filesCounter; 
+		num_threads = filesCounter;
+		printf("-num_threads %d\n", num_threads);
+	}
+
+	pthread_t tid[num_threads];
 
 	// Eisagwgh ka8e eggrafhs, olwn twn arxeiwn, ka8e subdirectory
 	// stis aparaithtes domes gia th fylaksi twn dedomenwn twn politwn
-	for (int j = 0; j < numCountries; j++)
+	for (int i = 0; i < num_threads; i++)
 	{
-		for (int  z = 0; z < counter[j]; z++)
-		{
-			// An den yparxei to arxeio synexise
-			if(files[j][z] == NULL)
-				continue;
-			strcpy(file,argv[j+11]);
-			strcat(file, "/");
-			strcat(file,files[j][z]);
-
-			fp=fopen(file,"r");
-
-			// Elegxos anoigmatos arxeioy
-			if(fp==NULL)
-			{
-				
-				printf("Open file error\n");
-				return 0;
-				
-			}
-			int brazilCounter = 0;
-			while(fgets(file_line,FILE_LINE_LENGTH-1,fp)!=NULL)
-			{
-				char current_line[200];
-				strcpy(current_line,file_line);		
-				
-				citizen_id=strtok(file_line," \t\n");
-				first_name=strtok(NULL," \t\n");
-				last_name=strtok(NULL," \t\n");
-				country_name=strtok(NULL," \t\n"); 
-				age=strtok(NULL," \t\n"); 
-				virus_name=strtok(NULL," \t\n");
-				vaccination_condition=strtok(NULL," \t\n"); 
-				date=strtok(NULL," \t\n");
-
-				if (strcmp(country_name,"Brazil")==0)
-				{
-					brazilCounter++;
-					printf("(%d) %s",brazilCounter, current_line);
-				}
-
-
-				citizen_record=HASH_add_patient(&record_hash_table,current_line);
-
-				
-				virus_node=BST_search(virus_tree,virus_name);			
-				
-				if(virus_node==NULL)
-				{
-					virus_node=BST_insert(&virus_tree,virus_name);	
-					num_of_viruses++;		
-				}
-				
-				// Ean prokeitai gia eggrafh emvoliasmenoy eisagetai sto bloom filter
-				//  kai sthn antistoixh lista emvoliasmenwn
-				if(!strcmp(vaccination_condition,"YES"))
-				{	
-					
-					for(i=0;i<16;i++)
-					{
-						// Kataskeyh string poy tha ginei hash
-						sprintf(bloom_string,"%s%s",citizen_id,virus_name);
-							
-						// Evresh theshs poy tha ginei set
-						bit_position=BLOOM_hash(bloom_string,i);
-						
-						BLOOM_insert(&bloom,bit_position);
-					}
-									
-					SKIP_LIST_insert(&(virus_node->vacc_list),atoi(citizen_id),citizen_record,date);
-								
-				}
-				// Diaforetika exoyme eisagwgh monaxa sth non vaccinated list
-				else
-					SKIP_LIST_insert(&(virus_node->not_vacc_list),atoi(citizen_id),citizen_record,NULL);	
-					
-			}
-
-			fclose(fp);
-		}
+		pthread_create(&tid[i], NULL, threadFunction, thread_args);
 	}
+
+
+
+	int threadCounter = 0;
+	for (int  i = 0; i < filesCounter; i++)
+	{
+		// strcpy(thread_args->file,filePaths[i]);
+		add_file_to_buffer(filePaths[i]);
+	}
+	for (int i = 0; i < num_threads; i++)
+	{
+		pthread_join(tid[i], NULL);
+	}
+
+	
+	// for (int j = 0; j < filesCounter; j++)
+	// {
+	// 	// pthread_mutex_lock(&mtx);
+	// 	strcpy(thread_args->file,filePaths[j]);
+	// 	// pthread_mutex_unlock(&mtx);
+		
+	// 	// printf("(%d)file: %s\n",fileCount,thread_args->file);
+
+	// 	pthread_create(&tid[threadCounter], NULL, threadFunction, thread_args);
+	// 	// printf("ThreadCounter %d\n", threadCounter);
+	// 	pthread_join(tid[threadCounter], NULL);
+	// 	threadCounter++;
+	// 	// usleep(2000);
+
+
+	// 	// for (int  z = 0; z < thread_args->counter[j]; z++)
+	// 	// {
+	// 	// 	// pthread_join(tid[z], (void*)&thread_args);
+	// 	// }
+
+	// }
+	// for (int j = 0; j < filesCounter; j++)
+	// {
+	// 	pthread_join(tid[j], NULL);
+	// }
+
+
+	// HASH_print(&(thread_args->record_hash_table));
 
 	// Exontas diavasei olous toys ioys, apo to dentro paragoyme antistoixo pinaka deiktwn sta onomata toys
 	// Boliko gia seiriakh prospelash
-	array_of_viruses=malloc(num_of_viruses*sizeof(node*));
+	array_of_viruses=malloc(thread_args->num_of_viruses*sizeof(node*));
 	
-	BST_fill_array(virus_tree,array_of_viruses);
+	BST_fill_array(thread_args->virus_tree,array_of_viruses);
 
+	if (( sock = socket ( AF_INET , SOCK_STREAM , 0) ) < 0)     {perror("socket client"); return -1;}
+
+	server.sin_family = AF_INET;    // Internet Domain
+    // memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
+    server.sin_addr.s_addr = htonl(INADDR_ANY); //inet_addr("127.0.0.1");
+    server.sin_port = htons(port);  // Server port
+
+	// Initiate connection
+    if ( connect ( sock , serverptr , sizeof ( server ) ) < 0)   {perror("connect client"); return -1;}
+    // printf ( "Connecting to port % d \n ", port ) ;
 
 	// Apostolh mege8oys bloom filter toy Monitor 
-	writeBytes = strlen(bloom.filter) +1;
+	writeBytes = strlen(thread_args->bloom.filter) +1;
     // if((fd1 = open(fifo1, O_WRONLY)) < 0 )     {perror("Open fifo1exec");    return -1;}
 	if((nwrite = write(sock,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 
@@ -351,11 +377,9 @@ int main(int argc, char** argv)
 	// H metablhth offset krataei ka8e fora ton ari8mo twn bytes poy exoun hdh stal8ei
 	while(offset < bloom_size)
 	{
-		if((nwrite = write(sock,bloom.filter + offset, socket_buff_size)) == -1)	{perror("write");   return -1;}
+		if((nwrite = write(sock,thread_args->bloom.filter + offset, socket_buff_size)) == -1)	{perror("write");   return -1;}
 		offset += nwrite;
 	}
-
-	BST_print(virus_tree);
 
 	// close(fd1);
 
@@ -373,19 +397,12 @@ int main(int argc, char** argv)
 		{
 			// To -1 ypodeiknyei oti to aithma egkri8hke
 			accepts ++;
-			// printf("accept\n");
-			// close(fd2);
-			// usleep(1);
-
 			continue;
 		}
 		else if(readBytes == -2)
 		{
 			// To -2 ypodeiknyei oti to aithma aporif8hke
 			rejects ++;
-			// printf("reject\n");
-			// usleep(1);
-			// close(fd2);
 
 			continue;
 		}
@@ -410,7 +427,7 @@ int main(int argc, char** argv)
 			record* requested_citizen;
 
 			// Periptwsh poy o poliths yparxei stis domes toy Monitor
-			if((requested_citizen=HASH_exists(&record_hash_table, citizen_id))!=NULL)
+			if((requested_citizen=HASH_exists(&(thread_args->record_hash_table), citizen_id))!=NULL)
 			{
 
 				writeBytes = strlen(requested_citizen->first_name) +1;
@@ -434,10 +451,10 @@ int main(int argc, char** argv)
 				if((nwrite = write(sock,&requested_citizen->age, sizeof(int))) == -1)    {perror("write");   return -1;}
 
 				// Apostolh ari8moy iwn
-				if((nwrite = write(sock,&num_of_viruses, sizeof(int))) == -1)    {perror("write");   return -1;}
+				if((nwrite = write(sock,&thread_args->num_of_viruses, sizeof(int))) == -1)    {perror("write");   return -1;}
 
 				// // Anazhthsh stis skip lists olwn twn iwn
-				for(i=0;i<num_of_viruses;i++)
+				for(i=0;i<thread_args->num_of_viruses;i++)
 				{
 					// Boh8htikh metablhth gia thn apanthsh sto travelMonitor 
 					unsigned short reply_bool;
@@ -483,6 +500,7 @@ int main(int argc, char** argv)
 		// Boh8htiko command
 		else if (strcmp(command,"continue")==0)
 		{
+			printf("Monitor continues\n");
 			continue;
 		}
 
@@ -501,7 +519,7 @@ int main(int argc, char** argv)
 			// close(fd2);
 
 			// Anazhtoyme ton komvo toy ioy sto dentro
-			virus_node=BST_search(virus_tree,virus_name);
+			virus_node=BST_search(thread_args->virus_tree,virus_name);
 			
 			// An brethei kanoyme anazhthsh sthn antistoixh skip list
 			if(virus_node)
@@ -546,8 +564,13 @@ int main(int argc, char** argv)
 			}
 			else
 			{
-				// Edw einai h periptwsh poy den exei brethei o ios
-				printf("Can't find virus\n");						
+				// Edw einai h periptwsh poy den exei vre8ei o ios
+				printf("Can't find virus\n");
+
+				// To -1 deixnei oti o ios de vre8hke
+				writeBytes=-1;
+				if((nwrite = write(sock,&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
+						
 			}
 		}
 	}
@@ -559,16 +582,16 @@ int main(int argc, char** argv)
     // close(fd2);
 
 	// Eleftherwsh domwn kai desmeymenhs mnhmhs
-	BLOOM_destroy(&bloom);
-	HASH_clear(&record_hash_table);
-	BST_destroy(virus_tree);
+	BLOOM_destroy(&(thread_args->bloom));
+	HASH_clear(&(thread_args->record_hash_table));
+	BST_destroy(thread_args->virus_tree);
 	free(array_of_viruses);
 
 
 	for (int i = 0; i < numCountries; i++)
 	{
 		free(subdirectory[i]);
-		for (int  j = 0; j < counter[i]; j++)
+		for (int  j = 0; j < thread_args->counter[i]; j++)
 		{
 			free(files[i][j]);
 		}
@@ -577,9 +600,143 @@ int main(int argc, char** argv)
 	}
 	
 	free(subdirectory);
-	free(counter);
+	free(thread_args->counter);
+	free(thread_args->file);
 	free(files);
-	
+	free(thread_args);
+
+	pthread_mutex_destroy(&mtxBuffer);
+	pthread_mutex_destroy(&mtx);
+    pthread_cond_destroy(&condBuffer);
 
     return 0;
+}
+
+void* threadFunction(void* arg)
+{
+	while(1)
+	{
+		char file[80];
+		pthread_mutex_lock(&mtxBuffer);
+		while(filesBufferCounter == 0)
+		{
+			pthread_cond_wait(&condBuffer, &mtxBuffer);
+		}
+		strcpy(file,filesBuffer[0]);
+		printf("threadFunction: %s\n", file);
+		for (int i = 0; i < filesBufferCounter-1; i++)
+		{
+			strcpy(filesBuffer[i],filesBuffer[i+1]);
+		}
+		filesBufferCounter--;
+		pthread_mutex_unlock(&mtxBuffer);
+		
+		// usleep(500000);
+		pthread_mutex_lock(&mtx);
+		arguments *thread_args = (arguments*)arg;
+		pthread_mutex_unlock(&mtx);
+
+
+		// Grammh arxeioy
+		char file_line[FILE_LINE_LENGTH];
+
+		// Pedia eggrafwn
+		char* citizen_id;
+		char* first_name;
+		char* last_name;
+		char* country_name;
+		char* age;
+		char* virus_name;
+		char* vaccination_condition;
+		char* date;
+
+		// Deikths se eggrafh citizen
+		record* citizen_record;
+
+		// Deikths se io
+		node* virus_node;
+
+		// To string poy ginetai hash sto bloom filter
+		unsigned char bloom_string[BLOOM_STRING_MAX_LENGTH];
+
+		// Boh8htikh metablhth
+		unsigned long bit_position;
+
+		
+		FILE* fp=fopen(file,"r");
+		// printf("%s\n", thread_args->file);
+
+		// Elegxos anoigmatos arxeioy
+		if(fp==NULL)
+		{
+			
+			printf("Open file error\n");
+			return 0;
+			
+		}
+		pthread_mutex_lock(&mtx);
+		int brazilCounter = 0;
+		while(fgets(file_line,FILE_LINE_LENGTH-1,fp)!=NULL)
+		{
+			char current_line[200];
+			strcpy(current_line,file_line);		
+			
+			citizen_id=strtok(file_line," \t\n");
+			first_name=strtok(NULL," \t\n");
+			last_name=strtok(NULL," \t\n");
+			country_name=strtok(NULL," \t\n"); 
+			age=strtok(NULL," \t\n"); 
+			virus_name=strtok(NULL," \t\n");
+			vaccination_condition=strtok(NULL," \t\n"); 
+			date=strtok(NULL," \t\n");
+
+			citizen_record=HASH_add_patient(&(thread_args->record_hash_table),current_line);
+
+			
+			virus_node=BST_search(thread_args->virus_tree,virus_name);			
+			
+			if(virus_node==NULL)
+			{
+				virus_node=BST_insert(&(thread_args->virus_tree),virus_name);	
+				thread_args->num_of_viruses++;		
+			}
+			
+			// Ean prokeitai gia eggrafh emvoliasmenoy eisagetai sto bloom filter
+			//  kai sthn antistoixh lista emvoliasmenwn
+			if(!strcmp(vaccination_condition,"YES"))
+			{	
+				
+				for(int i=0;i<16;i++)
+				{
+					// Kataskeyh string poy tha ginei hash
+					sprintf(bloom_string,"%s%s",citizen_id,virus_name);
+						
+					// Evresh theshs poy tha ginei set
+					bit_position=BLOOM_hash(bloom_string,i);
+					
+					BLOOM_insert(&(thread_args->bloom),bit_position);
+				}
+								
+				SKIP_LIST_insert(&(virus_node->vacc_list),atoi(citizen_id),citizen_record,date);
+							
+			}
+			// Diaforetika exoyme eisagwgh monaxa sth non vaccinated list
+			else
+				SKIP_LIST_insert(&(virus_node->not_vacc_list),atoi(citizen_id),citizen_record,NULL);	
+				
+		}
+		pthread_mutex_unlock(&mtx);
+		totalFilesEdited ++;
+		
+
+		fclose(fp);
+		if (totalFilesEdited >= thread_args->filesCounter - thread_args->num_threads +1)
+		{
+			printf("TotalFilesEdited %d , FilesCounter %d, FilesBufferCounter %d\n",totalFilesEdited, thread_args->filesCounter, filesBufferCounter);
+			break;
+		}
+
+	}
+
+	pthread_exit(NULL);
 }
