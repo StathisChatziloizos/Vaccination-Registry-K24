@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <netdb.h>
 
 
 #include "hash.h"
@@ -22,20 +23,18 @@
 #define NUM_OF_BUCKETS 50
 #define BLOOM_STRING_MAX_LENGTH 50
 
-static char** subdirectory;
+// static char** subdirectory;
 static int accepts = 0;
 static int rejects = 0;
 static int numCountries;
-static char filesBuffer[1000][80];
+static char filesBuffer[1000][70];
 static int filesBufferCounter = 0;
 static int totalFilesEdited = 0;
 
 
 typedef struct arguments{
-    int* counter;
 	int filesCounter;
-	int num_threads;
-    char* file;
+	unsigned int num_threads;
     hash_table record_hash_table;
     Tree virus_tree;
     int num_of_viruses;
@@ -58,7 +57,7 @@ void add_file_to_buffer(char* file)
 }
 
 // Synarthsh poy diaxeirizetai ta SIGINT/SIGQUIT twn Monitors
-void int_quit_children()
+void int_quit_children(int argc, char** argv)
 {
 	// Dhmioyrgia log_file.xxx arxeioy
 	char log_file[20];
@@ -66,23 +65,23 @@ void int_quit_children()
 	FILE* fp = fopen(log_file,"w+");
 
 	// Eisagwgh ka8e xwras sto log_file
-	// for (int i = 0; i < numCountries; i++)
-	// {
-	// 	int position=0;
-	// 	while (position < strlen(subdirectory[i]))
-	// 	{
-	// 		if (subdirectory[i][position] == '/')
-	// 		{
-	// 			break;
-	// 		}
-	// 		position++;
-	// 	}
+	for (int i = 11; i < argc; i++)
+	{
+		int position=0;
+		while (position < strlen(argv[i]))
+		{
+			if (argv[i][position] == '/')
+			{
+				break;
+			}
+			position++;
+		}
 
-	// 	// Metablhth poy krata th xwra apo to subdirectory (Morfh subdirextory: input_dir/xwra)
-	// 	char* country=subdirectory[i]+position+1;
-	// 	fputs(country,fp);
-	// 	fputs("\n",fp);
-	// }
+		// Metablhth poy krata th xwra apo to subdirectory (Morfh subdirextory: input_dir/xwra)
+		char* country=argv[i]+position+1;
+		fputs(country,fp);
+		fputs("\n",fp);
+	}
 
 	// Eisagwgh statistikwn sto log_file
 	fputs("\nTOTAL TRAVEL REQUESTS ",fp);
@@ -92,6 +91,7 @@ void int_quit_children()
 	fputs("REJECTS ",fp);
 	fprintf(fp,"%d\n",rejects);	
 	fclose(fp);
+	printf("MonitorServer logfile: %s \n",log_file);
 }
 
 const int pipeSize = 512;
@@ -132,7 +132,7 @@ int main(int argc, char** argv)
     // }
 
 	// Diaxeirismos SIGINT kai SIGQUIT
-	signal(SIGINT,int_quit_children);
+	// signal(SIGINT,int_quit_children);
 	// signal(SIGQUIT,int_quit_children);
 
     int nwrite, readBytes, writeBytes;
@@ -164,7 +164,7 @@ int main(int argc, char** argv)
 
 
 	// Desmeysh mnhmhs gia ta subdirectories/xwres
-	subdirectory = (char**)malloc(numCountries * sizeof(char*));
+	// subdirectory = (char**)malloc(numCountries * sizeof(char*));
 
 	// // Lhpsh bloom_size
 	// if(read(sock, &bloom_size,sizeof(unsigned long)) <0)     {perror("read");    return -1;}
@@ -173,16 +173,16 @@ int main(int argc, char** argv)
 	// Desmeysh mnhmhs enos pinaka arxeiwn kai enos metrhth arxeiwn ana xwra
 	// O pinakas arxeiwn exei th morfh:
 	// files[ari8mos xwrwn][ari8mos arxeiwn ths xwras]
-	char*** files = (char***)malloc(numCountries * sizeof(char**));
+	// char*** files = (char***)malloc(numCountries * sizeof(char**));
 	char* filePaths[1000];
 	int filesCounter = 0;
-	thread_args->counter = (int*)malloc(numCountries * sizeof(int));
+	// thread_args->counter = (int*)malloc(numCountries * sizeof(int));
 
 	// Gemisma toy pinaka arxeiwn me ta arxeia toy ka8e subdirectory 
 	for (int i = 0; i < numCountries; i++)
 	{
-		thread_args->counter[i]=0;
-		files[i] = (char**)malloc(40 * sizeof(char*));
+		// thread_args->counter[i]=0;
+		// files[i] = (char**)malloc(40 * sizeof(char*));
 		if((dir_ptr = opendir(argv[i+11])) == NULL) 		{perror("Open Dir"); 	return -1;}
 		while((dir = readdir(dir_ptr)) != NULL )
 		{
@@ -190,14 +190,14 @@ int main(int argc, char** argv)
 			if(strcmp(dir->d_name, ".")==0 || strcmp(dir->d_name, "..")==0)
 				continue;
 
-			files[i][thread_args->counter[i]] = (char*)malloc(strlen(dir->d_name)+1);
+			// files[i][thread_args->counter[i]] = (char*)malloc(strlen(dir->d_name)+1);
 			filePaths[filesCounter] = (char*)malloc(strlen(dir->d_name) + strlen(argv[i+11]) +2);
-			strcpy (files[i][thread_args->counter[i]],dir->d_name);
+			// strcpy (files[i][thread_args->counter[i]],dir->d_name);
 			strcpy (filePaths[filesCounter],argv[i+11]);
 			strcat (filePaths[filesCounter],"/");
 			strcat (filePaths[filesCounter],dir->d_name);
 			filesCounter++;
-			thread_args->counter[i]++;
+			// thread_args->counter[i]++;
 		}
 
 		closedir(dir_ptr);
@@ -285,16 +285,16 @@ int main(int argc, char** argv)
 	BLOOM_init(&(thread_args->bloom),bloom_size);
 
 	// Metablhth poy krataei to onoma toy trexontos arxeioy  
-	thread_args->file = (char*)malloc(50 * sizeof(char));
+	// thread_args->file = (char*)malloc(50 * sizeof(char));
 
 
-	printf("num_threads %d\n", num_threads);
+	// printf("num_threads %d\n", num_threads);
 	if(num_threads > filesCounter)
 	{
 		// thread_args->num_threads = thread_args->num_threads - thread_args->filesCounter; 
 		thread_args->num_threads = filesCounter; 
 		num_threads = filesCounter;
-		printf("-num_threads %d\n", num_threads);
+		// printf("numThread is more than total files of MonitorServer. numThread adjusted to %d\n", num_threads);
 	}
 
 	pthread_t tid[num_threads];
@@ -308,7 +308,7 @@ int main(int argc, char** argv)
 
 
 
-	int threadCounter = 0;
+	// int threadCounter = 0;
 	for (int  i = 0; i < filesCounter; i++)
 	{
 		// strcpy(thread_args->file,filePaths[i]);
@@ -357,9 +357,10 @@ int main(int argc, char** argv)
 
 	if (( sock = socket ( AF_INET , SOCK_STREAM , 0) ) < 0)     {perror("socket client"); return -1;}
 
+	struct hostent *rem = gethostbyname("localhost");
+
 	server.sin_family = AF_INET;    // Internet Domain
-    // memcpy(&server.sin_addr, rem->h_addr, rem->h_length);
-    server.sin_addr.s_addr = htonl(INADDR_ANY); //inet_addr("127.0.0.1");
+    memcpy (&server.sin_addr,rem->h_addr, rem->h_length);
     server.sin_port = htons(port);  // Server port
 
 	// Initiate connection
@@ -412,8 +413,9 @@ int main(int argc, char** argv)
 		if(read(sock, command, readBytes) < 0)     {perror("read");    return -1;}
 	
 		// Boh8htiko command
-		if (strcmp(command,"softExit")==0)
+		if (strcmp(command,"exit")==0)
 		{
+			int_quit_children(argc, argv);
 			break;
 		}
 
@@ -588,21 +590,21 @@ int main(int argc, char** argv)
 	free(array_of_viruses);
 
 
-	for (int i = 0; i < numCountries; i++)
-	{
-		free(subdirectory[i]);
-		for (int  j = 0; j < thread_args->counter[i]; j++)
-		{
-			free(files[i][j]);
-		}
+	// for (int i = 0; i < numCountries; i++)
+	// {
+	// 	free(subdirectory[i]);
+	// 	for (int  j = 0; j < thread_args->counter[i]; j++)
+	// 	{
+	// 		free(files[i][j]);
+	// 	}
 		
-		free(files[i]);
-	}
+	// 	free(files[i]);
+	// }
 	
-	free(subdirectory);
-	free(thread_args->counter);
-	free(thread_args->file);
-	free(files);
+	// free(subdirectory);
+	// free(thread_args->counter);
+	// free(thread_args->file);
+	// free(files);
 	free(thread_args);
 
 	pthread_mutex_destroy(&mtxBuffer);
@@ -616,14 +618,14 @@ void* threadFunction(void* arg)
 {
 	while(1)
 	{
-		char file[80];
+		char file[70];
 		pthread_mutex_lock(&mtxBuffer);
 		while(filesBufferCounter == 0)
 		{
 			pthread_cond_wait(&condBuffer, &mtxBuffer);
 		}
 		strcpy(file,filesBuffer[0]);
-		printf("threadFunction: %s\n", file);
+		// printf("threadFunction: %s\n", file);
 		for (int i = 0; i < filesBufferCounter-1; i++)
 		{
 			strcpy(filesBuffer[i],filesBuffer[i+1]);
@@ -664,7 +666,7 @@ void* threadFunction(void* arg)
 
 		
 		FILE* fp=fopen(file,"r");
-		// printf("%s\n", thread_args->file);
+		// printf("%s\n", file);
 
 		// Elegxos anoigmatos arxeioy
 		if(fp==NULL)
@@ -732,7 +734,7 @@ void* threadFunction(void* arg)
 		fclose(fp);
 		if (totalFilesEdited >= thread_args->filesCounter - thread_args->num_threads +1)
 		{
-			printf("TotalFilesEdited %d , FilesCounter %d, FilesBufferCounter %d\n",totalFilesEdited, thread_args->filesCounter, filesBufferCounter);
+			// printf("TotalFilesEdited %d , FilesCounter %d, FilesBufferCounter %d\n",totalFilesEdited, thread_args->filesCounter, filesBufferCounter);
 			break;
 		}
 

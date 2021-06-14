@@ -809,8 +809,8 @@ int main(int argc, char** argv)
 
 
 		}
-		// exit //
-		else if(strcmp(command_name,"exit")==0)
+		// hard_exit // SIGKILL sta monitors
+		else if(strcmp(command_name,"hard_exit")==0)
 		{
 			// apostolh SIGKILL sta Monitors
 			for (int i = 0; i < num_Monitors; i++)
@@ -822,8 +822,8 @@ int main(int argc, char** argv)
 		}
 
         	
-		// softExit // Boh8htiko command gia omalo exit
-		else if(strcmp(command_name,"softExit")==0)
+		// exit //
+		else if(strcmp(command_name,"exit")==0)
 		{
 			writeBytes = strlen(command_name) +1;
 			for(i=0; i < num_Monitors; i++)
@@ -832,6 +832,7 @@ int main(int argc, char** argv)
 				// if((fd2[i] = open(fifo2[i], O_WRONLY)) < 0 )     {perror("Open fifo2-TravelMonitor");    return -1;}
 				if((nwrite = write(newsock[i],&writeBytes, sizeof(int))) == -1)    {perror("write");   return -1;}
 				if((nwrite = write(newsock[i],command_name, writeBytes)) == -1)    {perror("write");   return -1;}
+				flag=1;
 				// close(fd2[i]);
 				
 			}
@@ -909,7 +910,7 @@ int main(int argc, char** argv)
 		fputs("REJECTS ",fp);
 		fprintf(fp,"%d\n",rejects);	
 		fclose(fp);
-		printf("logfile: %s \n",log_file);
+		printf("travelMonitorClient logfile: %s \n",log_file);
 	}
 	else
 	{
