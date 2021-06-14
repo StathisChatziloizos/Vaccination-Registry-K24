@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <netinet/in.h>
-#include <netdb.h>
+// #include <netdb.h>
 #include <arpa/inet.h>
 
 #define PORT 8080
@@ -15,6 +15,12 @@ void func(int sock, int port);
 int main(int argc, char** argv)
 {
     int port = atoi(argv[1]), sock, i;
+    printf("argc %d\n",argc);
+    for (int i = 0; i < argc; i++)
+    {
+        printf("argv[%d] %s\n",i,argv[i]);
+    }
+    
     // printf("\t\tPort %d\n",port);
 
     struct sockaddr_in server;
@@ -32,11 +38,12 @@ int main(int argc, char** argv)
 
     // Initiate connection
     if ( connect ( sock , serverptr , sizeof ( server ) ) < 0)   {perror("connect client"); return -1;}
-    printf ( "Connecting to port % d \n ", port ) ;
+    // printf ( "Connecting to port % d \n ", port ) ;
 
     func(sock, port);
     shutdown(sock, SHUT_RDWR);
     // close(sock);
+    // printf("Here\n");
 }
 
 
