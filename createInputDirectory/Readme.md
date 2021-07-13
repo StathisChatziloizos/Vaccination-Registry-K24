@@ -2,12 +2,12 @@
 
 ## Usage
 
-./testFile.sh diseases.txt countries.txt {num_of_records} {0/1}
+./testFile.sh diseases.txt countries.txt {num_of_records} {0/1}  
 ./create_infiles.sh inputFile {name_of_directory} {num_of_files_per_subdir}
 
 ## Example
 
-./testFile.sh diseases.txt countries.txt 20000 1
+./testFile.sh diseases.txt countries.txt 20000 1  
 ./create_infiles.sh inputFile inputDirectory 4
 
 ## Description
