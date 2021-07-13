@@ -1,0 +1,14 @@
+covid-19
+SAR
+H1N1
+Hepatitis
+Rabies
+Marburg
+Influenza
+Meningitis
+Chlamydia
+Ebola
+Hanta
+HPV
+HIV
+Typhus
